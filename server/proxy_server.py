@@ -3,91 +3,129 @@ import asyncio
 
 class NTBServer:
     def __init__(self):
-        self.client_reader = None
-        self.client_writer = None
-        # Очередь для передачи соединений из интернета клиенту
-        self.data_queue = asyncio.Queue()
+        # Очередь готовых data-соединений от клиента
+        # Клиент кладёт сюда соединения заранее, сервер забирает по мере надобности
+        self.data_connections: asyncio.Queue = asyncio.Queue()
+        self.control_writer = None
 
     async def start(self):
-        # 1. Запускаем порт для CLI-клиента
         control_server = await asyncio.start_server(
-            self.handle_control_connection, '0.0.0.0', 4443
+            self.handle_tunnel_connection, '0.0.0.0', 4443
         )
-        # 2. Запускаем порт для внешнего мира (интернет)
         public_server = await asyncio.start_server(
             self.handle_public_traffic, '0.0.0.0', 8000
         )
-        
-        print("🚀 NTB-67 Сервер запущен!")
-        print("   👉 Порт для клиента: 4443")
-        print("   👉 Публичный веб-порт: 8000")
-        
-        async with control_server, public_server:
-            await asyncio.gather(control_server.serve_forever(), public_server.serve_forever())
 
-    async def handle_control_connection(self, reader, writer):
-        """Принимает управляющее соединение от твоего CLI-клиента"""
-        print("🔗 CLI-клиент подключился к управляющему порту.")
-        self.client_reader = reader
-        self.client_writer = writer
-        
+        print("🚀 NTB-67 запущен!")
+        print("   👉 Туннельный порт: 4443")
+        print("   👉 Публичный порт:  8000")
+
+        async with control_server, public_server:
+            await asyncio.gather(
+                control_server.serve_forever(),
+                public_server.serve_forever()
+            )
+
+    async def handle_tunnel_connection(self, reader, writer):
+        """
+        Все соединения от клиента приходят сюда.
+        Первый байт — тип соединения:
+          C = управляющее (одно, постоянное)
+          D = соединение данных (много, пул)
+        """
+        conn_type = await reader.read(1)
+
+        if conn_type == b'C':
+            await self.handle_control(reader, writer)
+        elif conn_type == b'D':
+            await self.handle_data(reader, writer)
+        else:
+            writer.close()
+
+    async def handle_control(self, reader, writer):
+        """Управляющее соединение — живёт всё время пока клиент подключён"""
+        print("🔗 Клиент подключился (управляющий канал).")
+        self.control_writer = writer
+
         try:
-            # Держим соединение активным (heartbeat)
+            # Читаем heartbeat-пинги от клиента чтобы знать что он жив
             while True:
-                await asyncio.sleep(3600)
-        except asyncio.CancelledError:
-            print("❌ Соединение с клиентом разорвано.")
+                data = await reader.read(16)
+                if not data:
+                    break
+                # Клиент прислал PING → отвечаем PONG
+                if data.strip() == b'PING':
+                    writer.write(b'PONG\n')
+                    await writer.drain()
+        except Exception:
+            pass
         finally:
-            self.client_writer.close()
+            print("❌ Клиент отключился.")
+            self.control_writer = None
+            writer.close()
+
+    async def handle_data(self, reader, writer):
+        """
+        Клиент заранее открывает N таких соединений и они висят в очереди.
+        Когда придёт браузер — сервер возьмёт одно из них.
+        """
+        print("📦 Клиент добавил data-соединение в пул.")
+        # Кладём (reader, writer) в очередь — они будут ждать браузера
+        await self.data_connections.put((reader, writer))
 
     async def handle_public_traffic(self, web_reader, web_writer):
-        """Принимает трафик от обычных пользователей из интернета"""
-        print("🌐 Получен новый HTTP-запрос из интернета!")
-        
-        if not self.client_writer:
-            print("⚠️ Ошибка: Нет подключенных CLI-клиентов. Сбрасываем.")
+        """Браузер постучался на :8000"""
+        print("🌐 Входящий HTTP-запрос!")
+
+        if not self.control_writer:
+            print("⚠️  Нет клиента. Сбрасываем запрос.")
             web_writer.close()
             return
 
-        # Сигнализируем клиенту через управляющий канал: "Эй, к нам пришли!"
-        # Для MVP просто отправляем перенос строки как триггер
+        # Просим клиента добавить ещё одно data-соединение взамен того что возьмём
         try:
-            self.client_writer.write(b"NEW_CONNECTION\n")
-            await self.client_writer.drain()
+            self.control_writer.write(b'NEW_CONNECTION\n')
+            await self.control_writer.drain()
         except Exception:
-            print("❌ Не удалось свистнуть клиенту.")
+            print("❌ Не смогли достучаться до клиента.")
             web_writer.close()
             return
 
-        # Запускаем двусторонний мост (пайпинг байт) между вебом и клиентом
-        # Но подожди! Нам нужно второе соединение от клиента для данных.
-        # Для MVP упростим: перенаправляем напрямую (в полной версии здесь будет пул соединений)
-        # Ниже функция-мост, которая качает байты туда-обратно
-        await self.bridge(web_reader, web_writer)
+        # Ждём data-соединение из пула (клиент должен прислать быстро)
+        try:
+            data_reader, data_writer = await asyncio.wait_for(
+                self.data_connections.get(),
+                timeout=10.0  # если клиент не ответил за 10 сек — дропаем
+            )
+        except asyncio.TimeoutError:
+            print("⏱️  Клиент не прислал data-соединение вовремя.")
+            web_writer.close()
+            return
 
-    async def bridge(self, web_reader, web_writer):
-        """Перекачивает байты между веб-юзером и клиентом"""
+        print("🔀 Мост установлен, качаем байты...")
+        await self.bridge(web_reader, web_writer, data_reader, data_writer)
+
+    async def bridge(self, web_reader, web_writer, data_reader, data_writer):
+        """Двусторонняя перекачка байт между браузером и клиентом"""
         async def pipe(reader, writer):
             try:
                 while True:
-                    data = await reader.read(4096)
-                    if not data:
+                    chunk = await reader.read(4096)
+                    if not chunk:
                         break
-                    writer.write(data)
+                    writer.write(chunk)
                     await writer.drain()
             except Exception:
                 pass
             finally:
                 writer.close()
 
-        # Нам нужно читать из веба и писать клиенту, и наоборот.
-        # (В MVP версии этот упрощенный бридж работает для одного сквозного запроса)
-        if self.client_reader and self.client_writer:
-            await asyncio.gather(
-                pipe(web_reader, self.client_writer),
-                pipe(self.client_reader, web_writer)
-            )
+        await asyncio.gather(
+            pipe(web_reader, data_writer),   # браузер → клиент
+            pipe(data_reader, web_writer)    # клиент → браузер
+        )
+        print("✅ Запрос завершён.")
+
 
 if __name__ == "__main__":
-    server = NTBServer()
-    asyncio.run(server.start())
+    asyncio.run(NTBServer().start())
