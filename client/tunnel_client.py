@@ -1,21 +1,30 @@
 import asyncio
 import sys
+from typing import Tuple
 
 
 POOL_SIZE = 5  # сколько data-соединений держим наготове
 
 
 class NTBClient:
-    def __init__(self, server_host, server_port, local_port):
+    def __init__(self, server_host: str, server_port: int, local_port: int):
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
 
-    async def open_connection(self):
+    async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Хелпер: просто открыть TCP до сервера"""
         return await asyncio.open_connection(self.server_host, self.server_port)
 
-    async def start(self):
+    async def start(self) -> None:
+        while True:
+            try:
+                await self._start()
+            except (ConnectionRefusedError, OSError, asyncio.CancelledError) as e:
+                print(f"❌ Соединение разорвано: {e}. Новая попытка через 5 секунд...")
+                await asyncio.sleep(5)
+
+    async def _start(self) -> None:
         print(f"🔌 Подключаемся к {self.server_host}:{self.server_port}...")
 
         # 1. Открываем управляющее соединение
@@ -54,8 +63,9 @@ class NTBClient:
             print(f"💥 Ошибка: {e}")
         finally:
             ctrl_writer.close()
+            await ctrl_writer.wait_closed()
 
-    async def open_data_connection(self):
+    async def open_data_connection(self) -> None:
         """
         Открывает одно data-соединение и кладёт его на сервере в пул.
         Когда сервер его "разбудит" (придёт браузер) — начинаем проксировать.
@@ -82,7 +92,7 @@ class NTBClient:
         # Получили данные — проксируем на локальный порт
         await self.proxy_to_local(reader, writer, first_chunk)
 
-    async def proxy_to_local(self, server_reader, server_writer, first_chunk):
+    async def proxy_to_local(self, server_reader: asyncio.StreamReader, server_writer: asyncio.StreamWriter, first_chunk: bytes) -> None:
         """Проксирует трафик между сервером и localhost"""
         try:
             local_reader, local_writer = await asyncio.open_connection(
@@ -91,9 +101,10 @@ class NTBClient:
         except Exception:
             print(f"❌ localhost:{self.local_port} не отвечает!")
             server_writer.close()
+            await server_writer.wait_closed()
             return
 
-        async def pipe(reader, writer):
+        async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
             try:
                 while True:
                     data = await reader.read(4096)
@@ -105,6 +116,7 @@ class NTBClient:
                 pass
             finally:
                 writer.close()
+                await writer.wait_closed()
 
         # Отправляем первый чанк который уже прочитали
         local_writer.write(first_chunk)
