@@ -63,7 +63,10 @@ class NTBClient:
             print(f"💥 Ошибка: {e}")
         finally:
             ctrl_writer.close()
-            await ctrl_writer.wait_closed()
+            try:
+                await ctrl_writer.wait_closed()
+            except Exception:
+                pass
 
     async def open_data_connection(self) -> None:
         """
@@ -101,7 +104,10 @@ class NTBClient:
         except Exception:
             print(f"❌ localhost:{self.local_port} не отвечает!")
             server_writer.close()
-            await server_writer.wait_closed()
+            try:
+                await server_writer.wait_closed()
+            except Exception:
+                pass
             return
 
         async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -116,7 +122,10 @@ class NTBClient:
                 pass
             finally:
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
         # Отправляем первый чанк который уже прочитали
         local_writer.write(first_chunk)

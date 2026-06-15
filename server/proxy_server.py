@@ -41,7 +41,10 @@ class NTBServer:
             await self.handle_data(reader, writer)
         else:
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
 
     async def handle_control(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """Управляющее соединение — живёт всё время пока клиент подключён"""
@@ -64,7 +67,10 @@ class NTBServer:
             print("❌ Клиент отключился.")
             self.control_writer = None
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
 
     async def handle_data(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """
@@ -82,7 +88,10 @@ class NTBServer:
         if not self.control_writer:
             print("⚠️  Нет клиента. Сбрасываем запрос.")
             web_writer.close()
-            await web_writer.wait_closed()
+            try:
+                await web_writer.wait_closed()
+            except Exception:
+                pass
             return
 
         # Просим клиента добавить ещё одно data-соединение взамен того что возьмём
@@ -92,7 +101,10 @@ class NTBServer:
         except Exception:
             print("❌ Не смогли достучаться до клиента.")
             web_writer.close()
-            await web_writer.wait_closed()
+            try:
+                await web_writer.wait_closed()
+            except Exception:
+                pass
             return
 
         # Ждём data-соединение из пула (клиент должен прислать быстро)
@@ -104,7 +116,10 @@ class NTBServer:
         except asyncio.TimeoutError:
             print("⏱️  Клиент не прислал data-соединение вовремя.")
             web_writer.close()
-            await web_writer.wait_closed()
+            try:
+                await web_writer.wait_closed()
+            except Exception:
+                pass
             return
 
         print("🔀 Мост установлен, качаем байты...")
@@ -124,7 +139,10 @@ class NTBServer:
                 pass
             finally:
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
 
         await asyncio.gather(
             pipe(web_reader, data_writer),   # браузер → клиент
