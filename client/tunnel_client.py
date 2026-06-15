@@ -39,6 +39,8 @@ class NTBClient:
         await ctrl_writer.drain()
         print("✅ Управляющий канал открыт!")
 
+        asyncio.create_task(self.start_heartbeat(ctrl_writer))
+
         # 2. Заполняем пул data-соединений
         for _ in range(POOL_SIZE):
             asyncio.create_task(self.open_data_connection())
@@ -135,6 +137,16 @@ class NTBClient:
             pipe(server_reader, local_writer),
             pipe(local_reader, server_writer)
         )
+
+    # Фоновая задача на клиенте
+    async def start_heartbeat(self, writer: asyncio.StreamWriter) -> None:
+        try:
+            while True:
+                await asyncio.sleep(10)
+                writer.write(b'PING\n')
+                await writer.drain()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
