@@ -14,10 +14,8 @@
 """
 
 import asyncio
-import sys
 from common.utils import close_writer, pipe
 
-POOL_SIZE = 5
 
 class NTBClient:
     """Клиент туннелирования с поддержкой именованных поддоменов."""
@@ -104,8 +102,6 @@ class NTBClient:
             pass
 
 if __name__ == "__main__":
-    # Запуск: python tunnel_client.py <server_host> <local_port> <requested_subdomain>
-    # Пример: python tunnel_client.py 24tunl.ru 3000 my-cool-app
     asyncio.run(NTBClient(
         server_host="24tunl.ru",
         server_port=9000,
