@@ -7,6 +7,13 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
+"""Клиентское приложение для создания обратного туннеля (Reverse Proxy).
+
+Данный модуль содержит реализацию асинхронного клиента, который подключается
+к удаленному серверу туннелирования, поддерживает пул свободных соединений для
+данных и перенаправляет поступающий трафик на локальный порт (localhost).
+"""
+
 import asyncio
 import sys
 
@@ -17,16 +24,31 @@ POOL_SIZE = 5
 
 
 class NTBClient:
+    """Клиент для проксирования трафика через удаленный сервер на localhost."""
+
     def __init__(self, server_host: str, server_port: int, local_port: int):
+        """Инициализирует NTBClient необходимыми параметрами сети.
+
+        Args:
+            server_host: Имя хоста или IP-адрес удаленного сервера.
+            server_port: Порт удаленного сервера.
+            local_port: Локальный порт, на который перенаправляется трафик.
+        """
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
 
     async def open_connection(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        """Хелпер: просто открыть TCP до сервера."""
+        """Открывает TCP-соединение с удаленным сервером.
+
+        Returns:
+            Кортеж, содержащий StreamReader и StreamWriter для созданного
+            соединения.
+        """
         return await asyncio.open_connection(self.server_host, self.server_port)
 
     async def start(self) -> None:
+        """Запускает бесконечный цикл работы клиента с автореконнектом."""
         while True:
             try:
                 await self._start()
@@ -35,27 +57,28 @@ class NTBClient:
                 await asyncio.sleep(5)
 
     async def _start(self) -> None:
+        """Устанавливает управляющее соединение и инициализирует пул данных.
+
+        Raises:
+            Exception: При возникновении ошибок в процессе удержания соединения.
+        """
         print(f"🔌 Подключаемся к {self.server_host}:{self.server_port}...")
 
-        # 1. Открываем управляющее соединение
         try:
             ctrl_reader, ctrl_writer = await self.open_connection()
         except Exception as e:
             print(f"❌ Не удалось подключиться: {e}")
             return
 
-        # Первый байт — тип соединения
         ctrl_writer.write(b'C')
         await ctrl_writer.drain()
         print("✅ Управляющий канал открыт!")
 
         asyncio.create_task(self.start_heartbeat(ctrl_writer))
 
-        # 2. Заполняем пул data-соединений
         for _ in range(POOL_SIZE):
             asyncio.create_task(self.open_data_connection())
 
-        # 3. Слушаем команды от сервера
         print(f"🚀 Туннель активен! Трафик идёт на localhost:{self.local_port}")
         try:
             while True:
@@ -65,11 +88,9 @@ class NTBClient:
                     break
 
                 if line.strip() == b'NEW_CONNECTION':
-                    # Сервер взял одно соединение из пула — добавляем новое взамен
                     asyncio.create_task(self.open_data_connection())
-
                 elif line.strip() == b'PONG':
-                    pass  # heartbeat ответ, всё живо
+                    pass
 
         except Exception as e:
             print(f"💥 Ошибка: {e}")
@@ -77,22 +98,16 @@ class NTBClient:
             await close_writer(ctrl_writer)
 
     async def open_data_connection(self) -> None:
-        """
-        Открывает одно data-соединение и кладёт его на сервере в пул.
-        Когда сервер его "разбудит" (придёт браузер) — начинаем проксировать.
-        """
+        """Открывает новое соединение для данных и ожидает трафик от сервера."""
         try:
             reader, writer = await self.open_connection()
         except Exception as e:
             print(f"❌ Не удалось открыть data-соединение: {e}")
             return
 
-        # Первый байт — тип
         writer.write(b'D')
         await writer.drain()
 
-        # Ждём первых байт от сервера (это будет HTTP-запрос от браузера).
-        # Соединение просто висит в ожидании — это нормально.
         try:
             first_chunk = await reader.read(4096)
             if not first_chunk:
@@ -100,7 +115,6 @@ class NTBClient:
         except Exception:
             return
 
-        # Получили данные — проксируем на локальный порт
         await self.proxy_to_local(reader, writer, first_chunk)
 
     async def proxy_to_local(
@@ -109,7 +123,13 @@ class NTBClient:
         server_writer: asyncio.StreamWriter,
         first_chunk: bytes,
     ) -> None:
-        """Проксирует трафик между сервером и localhost."""
+        """Двунаправленно проксирует трафик между сервером и локальным портом.
+
+        Args:
+            server_reader: Читатель сокета удаленного сервера.
+            server_writer: Писатель сокета удаленного сервера.
+            first_chunk: Первый чанк данных, уже прочитанный из серверного сокета.
+        """
         try:
             local_reader, local_writer = await asyncio.open_connection(
                 '127.0.0.1', self.local_port
@@ -119,7 +139,6 @@ class NTBClient:
             await close_writer(server_writer)
             return
 
-        # Отправляем первый чанк, который уже прочитали
         local_writer.write(first_chunk)
         await local_writer.drain()
 
@@ -129,7 +148,11 @@ class NTBClient:
         )
 
     async def start_heartbeat(self, writer: asyncio.StreamWriter) -> None:
-        """Фоновая задача: шлёт PING каждые 10 секунд."""
+        """Периодически отправляет PING-сообщения для поддержания соединения.
+
+        Args:
+            writer: Писатель сокета управляющего соединения.
+        """
         try:
             while True:
                 await asyncio.sleep(10)
@@ -140,8 +163,8 @@ class NTBClient:
 
 
 if __name__ == "__main__":
-    host  = sys.argv[1] if len(sys.argv) > 1 else 'localhost'
-    port  = int(sys.argv[2]) if len(sys.argv) > 2 else 4443
+    host = sys.argv[1] if len(sys.argv) > 1 else 'localhost'
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 4443
     local = int(sys.argv[3]) if len(sys.argv) > 3 else 5000
 
     asyncio.run(NTBClient(host, port, local).start())

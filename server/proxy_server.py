@@ -7,19 +7,30 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
+"""Серверное приложение для работы обратного туннеля (Reverse Proxy).
+
+Данный модуль содержит реализацию асинхронного сервера, который принимает
+управляющие и дата-соединения от клиента, формирует пул соединений и
+перенаправляет публичный HTTP-трафик внутрь туннеля.
+"""
+
 import asyncio
 
 from common.utils import close_writer, pipe
 
 
 class NTBServer:
+    """Сервер туннелирования, координирующий трафик между клиентом и внешним миром."""
+
     def __init__(self):
-        # Очередь готовых data-соединений от клиента.
-        # Клиент кладёт сюда соединения заранее, сервер забирает по мере надобности.
-        self.data_connections = asyncio.Queue()
+        """Инициализирует NTBServer с пустой очередью дата-соединений."""
+        self.data_connections: asyncio.Queue[
+            tuple[asyncio.StreamReader, asyncio.StreamWriter]
+        ] = asyncio.Queue()
         self.control_writer = None
 
     async def start(self) -> None:
+        """Запускает управляющий сокет и публичный веб-сервер."""
         control_server = await asyncio.start_server(
             self.handle_tunnel_connection, '0.0.0.0', 4443
         )
@@ -42,11 +53,11 @@ class NTBServer:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """
-        Все соединения от клиента приходят сюда.
-        Первый байт — тип соединения:
-          C = управляющее (одно, постоянное)
-          D = соединение данных (много, пул)
+        """Определяет тип входящего туннельного соединения и маршрутизирует его.
+
+        Args:
+            reader: Читатель сокета туннельного соединения.
+            writer: Писатель сокета туннельного соединения.
         """
         conn_type = await reader.read(1)
 
@@ -62,17 +73,20 @@ class NTBServer:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """Управляющее соединение — живёт всё время пока клиент подключён."""
+        """Обрабатывает постоянное управляющее соединение и отвечает на пинги.
+
+        Args:
+            reader: Читатель сокета управляющего канала.
+            writer: Писатель сокета управляющего канала.
+        """
         print("🔗 Клиент подключился (управляющий канал).")
         self.control_writer = writer
 
         try:
-            # Читаем heartbeat-пинги от клиента, чтобы знать что он жив
             while True:
                 data = await reader.read(16)
                 if not data:
                     break
-                # Клиент прислал PING → отвечаем PONG
                 if data.strip() == b'PING':
                     writer.write(b'PONG\n')
                     await writer.drain()
@@ -81,7 +95,6 @@ class NTBServer:
         finally:
             print("❌ Клиент отключился.")
             self.control_writer = None
-            # [ИЗМЕНЕНО] Вместо 4 строк — вызов утилиты close_writer()
             await close_writer(writer)
 
     async def handle_data(
@@ -89,12 +102,13 @@ class NTBServer:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """
-        Клиент заранее открывает N таких соединений и они висят в очереди.
-        Когда придёт браузер — сервер возьмёт одно из них.
+        """Помещает новое соединение данных от клиента в пул ожидания.
+
+        Args:
+            reader: Читатель сокета соединения данных.
+            writer: Писатель сокета соединения данных.
         """
         print("📦 Клиент добавил data-соединение в пул.")
-        # Кладём (reader, writer) в queue — они будут ждать браузера
         await self.data_connections.put((reader, writer))
 
     async def handle_public_traffic(
@@ -102,7 +116,16 @@ class NTBServer:
         web_reader: asyncio.StreamReader,
         web_writer: asyncio.StreamWriter,
     ) -> None:
-        """Браузер постучался на :8000."""
+        """Принимает внешний HTTP-запрос и связывает его с соединением из пула.
+
+        Args:
+            web_reader: Читатель сокета внешнего веб-клиента.
+            web_writer: Писатель сокета внешнего веб-клиента.
+
+        Raises:
+            asyncio.TimeoutError: Если клиент не предоставил дата-соединение
+                в течение установленного таймаута.
+        """
         print("🌐 Входящий HTTP-запрос!")
 
         if not self.control_writer:
@@ -110,7 +133,6 @@ class NTBServer:
             await close_writer(web_writer)
             return
 
-        # Просим клиента добавить ещё одно data-соединение взамен того что возьмём
         try:
             self.control_writer.write(b'NEW_CONNECTION\n')
             await self.control_writer.drain()
@@ -119,11 +141,10 @@ class NTBServer:
             await close_writer(web_writer)
             return
 
-        # Ждём data-соединение из пула (клиент должен прислать быстро)
         try:
             data_reader, data_writer = await asyncio.wait_for(
                 self.data_connections.get(),
-                timeout=10.0  # если клиент не ответил за 10 сек — дропаем
+                timeout=10.0
             )
         except asyncio.TimeoutError:
             print("⏱️  Клиент не прислал data-соединение вовремя.")
@@ -140,11 +161,17 @@ class NTBServer:
         data_reader: asyncio.StreamReader,
         data_writer: asyncio.StreamWriter,
     ) -> None:
-        """Двусторонняя перекачка байт между браузером и клиентом."""
-        # из верхнего уровня файла, которая теперь общая для сервера и клиента.
+        """Организует двусторонний мост обмена данными между веб-клиентом и туннелем.
+
+        Args:
+            web_reader: Читатель сокета веб-клиента.
+            web_writer: Писатель сокета веб-клиента.
+            data_reader: Читатель сокета туннельного дата-соединения.
+            data_writer: Писатель сокета туннельного дата-соединения.
+        """
         await asyncio.gather(
-            pipe(web_reader, data_writer),   # браузер → клиент
-            pipe(data_reader, web_writer)    # клиент → браузер
+            pipe(web_reader, data_writer),
+            pipe(data_reader, web_writer)
         )
         print("✅ Запрос завершён.")
 
