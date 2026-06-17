@@ -7,152 +7,94 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Клиентское приложение для создания обратного туннеля (Reverse Proxy).
+"""Клиентское приложение для динамического подключения к серверу маршрутизации.
 
-Данный модуль содержит реализацию асинхронного клиента, который подключается
-к удаленному серверу туннелирования, поддерживает пул свободных соединений для
-данных и перенаправляет поступающий трафик на локальный порт (localhost).
+Данный модуль отвечает за авторизацию поддомена на сервере, обработку сигналов
+выделения дата-каналов и проброс входящих пакетов на локальный порт разработчика.
 """
 
 import asyncio
 import sys
-
 from common.utils import close_writer, pipe
-
 
 POOL_SIZE = 5
 
-
 class NTBClient:
-    """Клиент для проксирования трафика через удаленный сервер на localhost."""
+    """Клиент туннелирования с поддержкой именованных поддоменов."""
 
-    def __init__(self, server_host: str, server_port: int, local_port: int):
-        """Инициализирует NTBClient необходимыми параметрами сети.
-
-        Args:
-            server_host: Имя хоста или IP-адрес удаленного сервера.
-            server_port: Порт удаленного сервера.
-            local_port: Локальный порт, на который перенаправляется трафик.
-        """
+    def __init__(self, server_host: str, server_port: int, local_port: int, subdomain: str):
+        """Инициализирует NTBClient."""
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
+        self.subdomain = subdomain.lower()
 
     async def open_connection(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        """Открывает TCP-соединение с удаленным сервером.
-
-        Returns:
-            Кортеж, содержащий StreamReader и StreamWriter для созданного
-            соединения.
-        """
+        """Хелпер для быстрого открытия TCP-соединения до сервера."""
         return await asyncio.open_connection(self.server_host, self.server_port)
 
     async def start(self) -> None:
-        """Запускает бесконечный цикл работы клиента с автореконнектом."""
+        """Запускает основной цикл управляющего соединения и пула."""
         while True:
             try:
-                await self._start()
-            except (ConnectionRefusedError, OSError) as e:
-                print(f"❌ Соединение разорвано: {e}. Новая попытка через 5 секунд...")
+                print(f"⏳ Подключение к серверу {self.server_host}:{self.server_port}...")
+                reader, writer = await self.open_connection()
+
+                # Шаг 1: Авторизация поддомена
+                writer.write(f"INIT:{self.subdomain}\n".encode('utf-8'))
+                await writer.drain()
+
+                status = await reader.readline()
+                if status.strip() != b"OK":
+                    print(f"❌ Сервер отклонил регистрацию: {status.decode().strip()}")
+                    await close_writer(writer)
+                    await asyncio.sleep(5)
+                    continue
+
+                print(f"🎉 Туннель успешно запущен на https://{self.subdomain}.24tunl.ru")
+
+                # Запуск таска для поддержания соединения (Heartbeat)
+                heartbeat_task = asyncio.create_task(self.start_heartbeat(writer))
+
+                # Шаг 2: Ожидание команд от сервера на создание дата-сокетов
+                while True:
+                    cmd = await reader.readline()
+                    if not cmd:
+                        break  # Сервер закрыл коннект
+
+                    if cmd.strip() == b"REQUEST_CONN":
+                        # Сервер просит сокет под новый HTTP-запрос — создаем его асинхронно
+                        asyncio.create_task(self.spawn_data_connection())
+
+            except Exception as e:
+                print(f"⚠️ Ошибка сети: {e}. Повтор через 5 секунд...")
                 await asyncio.sleep(5)
 
-    async def _start(self) -> None:
-        """Устанавливает управляющее соединение и инициализирует пул данных.
-
-        Raises:
-            Exception: При возникновении ошибок в процессе удержания соединения.
-        """
-        print(f"🔌 Подключаемся к {self.server_host}:{self.server_port}...")
-
+    async def spawn_data_connection(self) -> None:
+        """Создает новый выделенный дата-канал для конкретного HTTP-запроса."""
         try:
-            ctrl_reader, ctrl_writer = await self.open_connection()
-        except Exception as e:
-            print(f"❌ Не удалось подключиться: {e}")
-            return
+            # Открываем сокет к серверу туннелирования
+            server_reader, server_writer = await self.open_connection()
+            
+            # Маркируем сокет, чтобы сервер понял, какому поддомену он принадлежит
+            server_writer.write(f"DATA:{self.subdomain}\n".encode('utf-8'))
+            await server_writer.drain()
 
-        ctrl_writer.write(b'C')
-        await ctrl_writer.drain()
-        print("✅ Управляющий канал открыт!")
-
-        asyncio.create_task(self.start_heartbeat(ctrl_writer))
-
-        for _ in range(POOL_SIZE):
-            asyncio.create_task(self.open_data_connection())
-
-        print(f"🚀 Туннель активен! Трафик идёт на localhost:{self.local_port}")
-        try:
-            while True:
-                line = await ctrl_reader.readline()
-                if not line:
-                    print("❌ Сервер закрыл соединение.")
-                    break
-
-                if line.strip() == b'NEW_CONNECTION':
-                    asyncio.create_task(self.open_data_connection())
-                elif line.strip() == b'PONG':
-                    pass
+            # Открываем сокет к нашему локальному сайту/серверу (например, к порту 3000 или 80)
+            local_reader, local_writer = await asyncio.open_connection('127.0.0.1', self.local_port)
 
         except Exception as e:
-            print(f"💥 Ошибка: {e}")
-        finally:
-            await close_writer(ctrl_writer)
-
-    async def open_data_connection(self) -> None:
-        """Открывает новое соединение для данных и ожидает трафик от сервера."""
-        try:
-            reader, writer = await self.open_connection()
-        except Exception as e:
-            print(f"❌ Не удалось открыть data-соединение: {e}")
+            print(f"❌ Не удалось связать дата-каналы: {e}")
             return
 
-        writer.write(b'D')
-        await writer.drain()
-
-        try:
-            first_chunk = await reader.read(4096)
-            if not first_chunk:
-                return
-        except Exception:
-            return
-
-        await self.proxy_to_local(reader, writer, first_chunk)
-
-    async def proxy_to_local(
-        self,
-        server_reader: asyncio.StreamReader,
-        server_writer: asyncio.StreamWriter,
-        first_chunk: bytes,
-    ) -> None:
-        """Двунаправленно проксирует трафик между сервером и локальным портом.
-
-        Args:
-            server_reader: Читатель сокета удаленного сервера.
-            server_writer: Писатель сокета удаленного сервера.
-            first_chunk: Первый чанк данных, уже прочитанный из серверного сокета.
-        """
-        try:
-            local_reader, local_writer = await asyncio.open_connection(
-                '127.0.0.1', self.local_port
-            )
-        except Exception:
-            print(f"❌ localhost:{self.local_port} не отвечает!")
-            await close_writer(server_writer)
-            return
-
-        local_writer.write(first_chunk)
-        await local_writer.drain()
-
+        # Начинаем качать байты в обе стороны
         await asyncio.gather(
             pipe(server_reader, local_writer),
             pipe(local_reader, server_writer)
         )
 
     async def start_heartbeat(self, writer: asyncio.StreamWriter) -> None:
-        """Периодически отправляет PING-сообщения для поддержания соединения.
-
-        Args:
-            writer: Писатель сокета управляющего соединения.
-        """
+        """Каждые 10 секунд шлет PING, защищая сокет от молчаливого дропа файрволами."""
         try:
             while True:
                 await asyncio.sleep(10)
@@ -161,10 +103,12 @@ class NTBClient:
         except Exception:
             pass
 
-
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else 'localhost'
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 4443
-    local = int(sys.argv[3]) if len(sys.argv) > 3 else 5000
-
-    asyncio.run(NTBClient(host, port, local).start())
+    # Запуск: python tunnel_client.py <server_host> <local_port> <requested_subdomain>
+    # Пример: python tunnel_client.py 24tunl.ru 3000 my-cool-app
+    asyncio.run(NTBClient(
+        server_host="24tunl.ru",
+        server_port=9000,
+        local_port=8000,
+        subdomain="test"
+    ).start())
