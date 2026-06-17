@@ -60,9 +60,9 @@ class NTBServer:
             # Если клиент запрашивает инициализацию нового туннеля
             if line == "INIT":
                 # Генерируем уникальный случайный поддомен (16 символов)
-                subdomain = secrets.token_hex(8)
+                subdomain = secrets.token_hex(16)
                 while subdomain in self.active_tunnels:
-                    subdomain = secrets.token_hex(8)
+                    subdomain = secrets.token_hex(16)
 
                 print(f"🚀 Регистрируем новый туnнель для поддомена: {subdomain}")
                 
@@ -75,9 +75,6 @@ class NTBServer:
                 writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
 
-                # Запускаем пинг-понг, чтобы соединение не разрывалось
-                await self.start_heartbeat(reader, subdomain)
-
             # Если клиент открыл сокет для передачи данных трафика
             elif line.startswith("DATA:"):
                 subdomain = line.split(":", 1)[1].strip()
@@ -86,11 +83,11 @@ class NTBServer:
                     print(f"📦 Сокет данных добавлен в пул для поддомена: {subdomain}")
                 else:
                     print(f"⚠️ Токен данных для неизвестного поддомена: {subdomain}")
-                    close_writer(writer)
+                    await close_writer(writer)
 
         except Exception as e:
             print(f"❌ Ошибка при обработке клиента: {e}")
-            close_writer(writer)
+            await close_writer(writer)
 
     async def handle_web_request(
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
