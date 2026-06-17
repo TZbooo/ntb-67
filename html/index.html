@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>В процессе разработки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+  /* ============ TOKENS ============ */
+  :root{
+    --ink: #0B2545;
+    --ink-soft: #3A5A85;
+    --blue-700: #155EEF;
+    --blue-600: #2563EB;
+    --blue-500: #3B82F6;
+    --blue-300: #93C5FD;
+    --blue-200: #BFDBFE;
+    --blue-100: #DCEAFD;
+    --blue-50: #EFF6FF;
+    --white: #FFFFFF;
+
+    --shadow-pop: 0 10px 0 rgba(21,94,239,0.18);
+    --shadow-pop-sm: 0 6px 0 rgba(21,94,239,0.16);
+    --shadow-card: 0 18px 40px -18px rgba(21,94,239,0.28);
+
+    --radius-xl: 32px;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-pill: 999px;
+
+    --font-display: "Fredoka", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin:0;
+    background: var(--blue-50);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  img, svg{ display:block; max-width:100%; }
+
+  a{ color: inherit; }
+
+  /* subtle dotted/grid texture on the page background, like a notebook the project is being sketched on */
+  .bg-texture{
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(circle, rgba(21,94,239,0.10) 1.6px, transparent 1.6px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, transparent, black 8%, black 70%, transparent);
+  }
+
+  .wrap{
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ============ NAV ============ */
+  nav.topbar{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    padding: 28px 32px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+  }
+  .brand .dot{
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--blue-700);
+    box-shadow: 0 0 0 4px var(--blue-200);
+  }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background: var(--white);
+    border: 1.5px solid var(--blue-200);
+    color: var(--blue-700);
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 8px 16px 8px 12px;
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-pop-sm);
+  }
+  .status-pill .pulse{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--blue-500);
+    position: relative;
+  }
+  .status-pill .pulse::after{
+    content:"";
+    position:absolute; inset:-4px;
+    border-radius:50%;
+    border: 2px solid var(--blue-500);
+    animation: pulse-ring 1.8s ease-out infinite;
+  }
+  @keyframes pulse-ring{
+    0%{ transform: scale(0.6); opacity: 0.9; }
+    100%{ transform: scale(1.8); opacity: 0; }
+  }
+
+  /* ============ HERO ============ */
+  .hero{
+    padding: 36px 0 10px;
+    display:grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 48px;
+    align-items: center;
+  }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--blue-600);
+    margin: 0 0 14px;
+  }
+
+  h1{
+    font-family: var(--font-display);
+    font-size: clamp(2.3rem, 4.2vw, 3.4rem);
+    line-height: 1.05;
+    font-weight: 600;
+    margin: 0 0 18px;
+    letter-spacing: -0.01em;
+  }
+  h1 .accent{ color: var(--blue-700); }
+
+  .hero p.lede{
+    font-size: 1.08rem;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    max-width: 480px;
+    margin: 0 0 30px;
+  }
+
+  .hero-actions{
+    display:flex;
+    gap:14px;
+    flex-wrap: wrap;
+  }
+
+  .btn{
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.98rem;
+    border: none;
+    cursor: pointer;
+    border-radius: var(--radius-pill);
+    padding: 15px 26px;
+    transition: transform .12s ease, box-shadow .12s ease;
+    text-decoration: none;
+    color: inherit;
+    display: inline-block;
+  }
+  .btn:active{ transform: translateY(4px); }
+
+  .btn-primary{
+    background: var(--blue-700);
+    color: var(--white);
+    box-shadow: var(--shadow-pop);
+  }
+  .btn-primary:hover{ background: var(--blue-600); }
+  .btn-primary:active{ box-shadow: 0 4px 0 rgba(21,94,239,0.18); }
+
+  .btn-ghost{
+    background: var(--white);
+    color: var(--blue-700);
+    border: 2px solid var(--blue-200);
+  }
+  .btn-ghost:hover{ border-color: var(--blue-300); }
+  .btn-ghost:active{ box-shadow: none; }
+
+  /* ---- mascot scene ---- */
+  .scene{
+    position: relative;
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+    min-height: 320px;
+  }
+
+  .scene svg{ width: 100%; max-width: 380px; }
+
+  .float-chip{
+    position:absolute;
+    background: var(--white);
+    border: 1.5px solid var(--blue-100);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-md);
+    padding: 9px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--blue-700);
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .float-chip .sq{ width:7px;height:7px;background:var(--blue-500);border-radius:2px; }
+  .chip-1{ top: 4%; left: -2%; animation: bob 4.5s ease-in-out infinite; }
+  .chip-2{ top: 18%; right: -4%; animation: bob 4.5s ease-in-out infinite 1.1s; }
+  .chip-3{ bottom: 12%; left: 2%; animation: bob 4.5s ease-in-out infinite 2.2s; }
+  @keyframes bob{
+    0%, 100%{ transform: translateY(0); }
+    50%{ transform: translateY(-9px); }
+  }
+
+  /* ============ PROGRESS STRIP ============ */
+  .progress-card{
+    margin: 56px 0 0;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    border: 1.5px solid var(--blue-100);
+    box-shadow: var(--shadow-card);
+    padding: 26px 30px;
+  }
+  .progress-top{
+    display:flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .progress-top strong{
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .progress-top span{
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--blue-600);
+    font-weight: 600;
+  }
+  .progress-track{
+    height: 18px;
+    background: var(--blue-50);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    position: relative;
+    border: 1.5px solid var(--blue-100);
+  }
+  .progress-fill{
+    height: 100%;
+    width: 41%;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, var(--blue-500), var(--blue-700));
+    position: relative;
+    animation: wobble 3.2s ease-in-out infinite;
+    transform-origin: left center;
+  }
+  @keyframes wobble{
+    0%, 100%{ width: 39%; }
+    50%{ width: 42%; }
+  }
+  .progress-note{
+    margin: 12px 0 0;
+    font-size: 0.86rem;
+    color: var(--ink-soft);
+  }
+
+  /* ============ TRUTH CARDS ============ */
+  .section{ padding: 88px 0; }
+  .section-head{
+    text-align:center;
+    max-width: 560px;
+    margin: 0 auto 44px;
+  }
+  .section-head .eyebrow{ justify-content: center; }
+  .section-head h2{
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 2.6vw, 2.2rem);
+    font-weight: 600;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .section-head p{
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .truth-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+  }
+  .truth-card{
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    border: 1.5px solid var(--blue-100);
+    padding: 28px 24px;
+    box-shadow: var(--shadow-pop-sm);
+    transition: transform .18s ease;
+  }
+  .truth-card:hover{ transform: translateY(-4px); }
+
+  .truth-icon{
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-md);
+    background: var(--blue-50);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom: 18px;
+  }
+  .truth-icon svg{ width: 26px; height: 26px; }
+
+  .truth-card h3{
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .truth-card p{
+    font-size: 0.93rem;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  /* ============ LESSON PATH ============ */
+  .path-section{
+    background: var(--white);
+    border-radius: var(--radius-xl);
+    padding: 64px 48px;
+    border: 1.5px solid var(--blue-100);
+  }
+
+  .path{
+    position: relative;
+    max-width: 560px;
+    margin: 0 auto;
+    padding-top: 8px;
+  }
+
+  .path-node{
+    display:grid;
+    grid-template-columns: 1fr 60px 1fr;
+    align-items: center;
+    column-gap: 24px;
+    margin-bottom: 4px;
+  }
+  .path-node .rail{
+    grid-column: 2;
+    position: relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height: 100%;
+    min-height: 84px;
+  }
+  .path-node .rail::before{
+    content:"";
+    position:absolute;
+    top: -4px;
+    bottom: -4px;
+    left: 50%;
+    width: 6px;
+    margin-left: -3px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--blue-200) 0,
+      var(--blue-200) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+    border-radius: 4px;
+    z-index: 0;
+  }
+  .path-node:first-child .rail::before{ top: 50%; }
+  .path-node:last-child .rail::before{ bottom: 50%; }
+
+  .path-node .card-slot{ display:flex; }
+  .path-node.is-left .card-slot.left{ justify-content: flex-end; }
+  .path-node.is-left .card-slot.right{ visibility: hidden; }
+  .path-node.is-right .card-slot.left{ visibility: hidden; }
+  .path-node.is-right .card-slot.right{ justify-content: flex-start; }
+
+  .node-dot{
+    position: relative;
+    z-index: 2;
+    flex: 0 0 auto;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--blue-700);
+    box-shadow: var(--shadow-pop);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .path-node.is-pending .node-dot{
+    background: var(--white);
+    border: 3px solid var(--blue-200);
+    box-shadow: none;
+  }
+  .node-dot svg{ width: 26px; height: 26px; }
+  .node-dot.spin svg{ animation: spin 2.4s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .node-card{
+    background: var(--blue-50);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    width: 100%;
+    max-width: 230px;
+    border: 1.5px solid var(--blue-100);
+  }
+  .path-node.is-pending .node-card{ opacity: 0.55; }
+  .node-card .tag{
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--blue-600);
+    display:block;
+    margin-bottom: 4px;
+  }
+  .node-card .title{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.98rem;
+    line-height: 1.35;
+    display: block;
+  }
+
+  /* ============ NOTICE / readme box ============ */
+  .notice{
+    margin-top: 28px;
+    background: var(--blue-50);
+    border: 1.5px dashed var(--blue-300);
+    border-radius: var(--radius-lg);
+    padding: 26px 30px;
+    display:flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+  .notice svg{ flex-shrink:0; width: 30px; height: 30px; margin-top: 2px; }
+  .notice p{
+    margin:0;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: var(--ink-soft);
+  }
+  .notice strong{ color: var(--ink); }
+
+  /* ============ FOOTER ============ */
+  footer{
+    padding: 70px 0 56px;
+    text-align: center;
+  }
+  footer .wave-wrap{ margin-bottom: 18px; }
+  footer h3{
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  footer p{
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin: 0 0 26px;
+  }
+  footer .foot-meta{
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--blue-300);
+  }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 880px){
+    .hero{ grid-template-columns: 1fr; }
+    .scene{ order: -1; min-height: 260px; }
+    .truth-grid{ grid-template-columns: 1fr; }
+    .path-section{ padding: 40px 20px; }
+    .path-node{
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .path-node .rail{ flex: 0 0 44px; min-height: 64px; }
+    .path-node .card-slot{
+      display: flex !important;
+      visibility: visible !important;
+      justify-content: flex-start !important;
+      flex: 1 1 auto;
+    }
+    .path-node .card-slot .node-card:empty{ display: none; }
+    .node-dot{ width: 44px; height: 44px; }
+    .node-dot svg{ width: 20px; height: 20px; }
+    .node-card{ max-width: none; font-size: 0.92rem; }
+  }
+  @media (max-width: 560px){
+    .wrap, nav.topbar{ padding-left: 20px; padding-right: 20px; }
+    .notice{ flex-direction: column; }
+    nav.topbar{
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 14px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  :focus-visible{
+    outline: 3px solid var(--blue-500);
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="bg-texture"></div>
+
+<nav class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    ntb-67
+  </div>
+  <span class="status-pill">
+    <span class="pulse"></span>
+    в активной разработке
+  </span>
+</nav>
+
+<header class="wrap hero">
+  <div>
+    <p class="eyebrow">// статус репозитория</p>
+    <h1>Здесь пока<br>стройка, а не <span class="accent">приложение</span>.</h1>
+    <p class="lede">
+      Каждый день меняется архитектура, логика и структура проекта.
+      Инструкций по установке нет — и это специально: мы не хотим
+      описывать то, что переписываем заново.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/TZbooo/ntb-67" target="_blank">Смотреть исходный код</a>
+      <a class="btn btn-ghost" href="https://www.threads.com/@timur_zolotov_dev" target="_blank">Следить за прогрессом</a>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="float-chip chip-1"><span class="sq"></span>build: unstable</div>
+    <div class="float-chip chip-2"><span class="sq"></span>npm run dev</div>
+    <div class="float-chip chip-3"><span class="sq"></span>commits: daily</div>
+
+    <svg viewBox="0 0 380 360" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- ground -->
+      <ellipse cx="190" cy="332" rx="140" ry="14" fill="var(--blue-100)"/>
+
+      <!-- block stack (unfinished structure) -->
+      <rect x="70" y="270" width="64" height="56" rx="10" fill="var(--blue-200)"/>
+      <rect x="140" y="246" width="64" height="80" rx="10" fill="var(--blue-300)"/>
+      <rect x="210" y="270" width="64" height="56" rx="10" fill="var(--blue-200)"/>
+      <rect x="140" y="180" width="64" height="60" rx="10" fill="var(--blue-500)" opacity="0.92"/>
+
+      <!-- a block mid-air, still being placed -->
+      <rect x="240" y="120" width="56" height="50" rx="10" fill="var(--blue-700)">
+        <animateTransform attributeName="transform" type="translate"
+          values="0 0; 0 -10; 0 0" dur="2.6s" repeatCount="indefinite"/>
+      </rect>
+
+      <!-- mascot blob -->
+      <g>
+        <animateTransform attributeName="transform" type="translate"
+          values="0 0; 0 -6; 0 0" dur="2.6s" repeatCount="indefinite"/>
+        <!-- body -->
+        <path d="M120 250
+                 C 96 250 80 228 84 200
+                 C 88 168 112 150 150 150
+                 C 188 150 214 172 216 204
+                 C 218 232 200 250 176 250
+                 Z"
+              fill="var(--blue-700)"/>
+        <!-- arm reaching up toward floating block -->
+        <path d="M186 196 C 206 184 224 168 236 150"
+              stroke="var(--blue-700)" stroke-width="16" stroke-linecap="round" fill="none"/>
+        <!-- eyes -->
+        <circle cx="132" cy="202" r="7" fill="var(--white)"/>
+        <circle cx="166" cy="202" r="7" fill="var(--white)"/>
+        <circle cx="134" cy="203" r="3.4" fill="var(--ink)"/>
+        <circle cx="168" cy="203" r="3.4" fill="var(--ink)"/>
+        <!-- rosy cheeks -->
+        <circle cx="118" cy="218" r="6" fill="var(--blue-300)" opacity="0.6"/>
+        <circle cx="180" cy="218" r="6" fill="var(--blue-300)" opacity="0.6"/>
+        <!-- little smile -->
+        <path d="M140 222 Q 150 230 160 222" stroke="var(--white)" stroke-width="4" stroke-linecap="round" fill="none"/>
+      </g>
+    </svg>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="progress-card">
+    <div class="progress-top">
+      <strong>Готовность проекта</strong>
+      <span>≈ 41% · обновляется каждый коммит</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill"></div>
+    </div>
+    <p class="progress-note">Честно говоря, эта цифра примерная — но она точно растёт, а не падает.</p>
+  </div>
+</div>
+
+<section class="section wrap" id="status">
+  <div class="section-head">
+    <p class="eyebrow">// что нужно знать прямо сейчас</p>
+    <h2>Три честные вещи о текущем состоянии</h2>
+    <p>Никаких маркетинговых формулировок — только то, что есть на самом деле.</p>
+  </div>
+
+  <div class="truth-grid">
+    <article class="truth-card">
+      <div class="truth-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 19l5-5m0 0l4.5-9.5L20 7l-9.5 4.5-1.5 1.5-5 5z" stroke="var(--blue-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Инструкций пока нет</h3>
+      <p>Кодовая база и структура проекта меняются каждый день, поэтому подробное руководство по установке появится только когда архитектура устоится.</p>
+    </article>
+
+    <article class="truth-card">
+      <div class="truth-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5m0 3h.01M3 12a9 9 0 1018 0 9 9 0 10-18 0z" stroke="var(--blue-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Без гарантий стабильности</h3>
+      <p>Проект не готов для конечного пользователя. Что-то может падать, ломаться или быть недописанным — это нормальное состояние на этом этапе.</p>
+    </article>
+
+    <article class="truth-card">
+      <div class="truth-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" stroke="var(--blue-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.5-2.5 2-2.5 3.5M12 17h.01" stroke="var(--blue-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Для любопытных</h3>
+      <p>Исходный код открыт для изучения. Но «из коробки» пока ничего стабильно не запускается — и мы предупреждаем об этом заранее.</p>
+    </article>
+  </div>
+</section>
+
+<section class="section wrap">
+  <div class="section-head">
+    <p class="eyebrow">// путь до стабильной версии</p>
+    <h2>Куда мы сейчас идём</h2>
+    <p>Так выглядит маршрут от текущего хаоса до первого полноценного README.</p>
+  </div>
+
+  <div class="path-section">
+    <div class="path">
+
+      <div class="path-node is-left">
+        <div class="card-slot left">
+          <div class="node-card">
+            <span class="tag">сделано</span>
+            <span class="title">Базовая архитектура</span>
+          </div>
+        </div>
+        <div class="rail">
+          <div class="node-dot">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="var(--white)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="card-slot right"><div class="node-card"></div></div>
+      </div>
+
+      <div class="path-node is-right">
+        <div class="card-slot left"><div class="node-card"></div></div>
+        <div class="rail">
+          <div class="node-dot">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="var(--white)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="card-slot right">
+          <div class="node-card">
+            <span class="tag">сделано</span>
+            <span class="title">Ключевая логика</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="path-node is-left">
+        <div class="card-slot left">
+          <div class="node-card">
+            <span class="tag">сейчас</span>
+            <span class="title">Стабилизация ключевого функционала</span>
+          </div>
+        </div>
+        <div class="rail">
+          <div class="node-dot spin">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-6.66l1.42-1.42M4.92 19.08l1.42-1.42M19.08 19.08l-1.42-1.42M4.92 4.92L6.34 6.34" stroke="var(--white)" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="card-slot right"><div class="node-card"></div></div>
+      </div>
+
+      <div class="path-node is-right is-pending">
+        <div class="card-slot left"><div class="node-card"></div></div>
+        <div class="rail">
+          <div class="node-dot">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="1.6" fill="var(--blue-300)"/></svg>
+          </div>
+        </div>
+        <div class="card-slot right">
+          <div class="node-card">
+            <span class="tag">дальше</span>
+            <span class="title">Базовый каркас готов</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="path-node is-left is-pending">
+        <div class="card-slot left">
+          <div class="node-card">
+            <span class="tag">финал</span>
+            <span class="title">Полноценный README с инструкциями</span>
+          </div>
+        </div>
+        <div class="rail">
+          <div class="node-dot">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="1.6" fill="var(--blue-300)"/></svg>
+          </div>
+        </div>
+        <div class="card-slot right"><div class="node-card"></div></div>
+      </div>
+
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="var(--blue-600)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p>
+        <strong>Если вы здесь по ссылке на репозиторий:</strong> можно смело
+        смотреть код и архитектуру, но запускать проект «как есть» пока
+        смысла нет — стабильной сборки ещё не существует. Как только базовый
+        каркас будет готов, здесь появится полноценный README с инструкциями.
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">
+  <h3>Спасибо, что заглянули.</h3>
+  <p>Возвращайтесь немного позже — к тому моменту здесь будет гораздо меньше строительных лесов.</p>
+  <div class="foot-meta">README.md · обновится после стабилизации каркаса</div>
+</footer>
+
+</body>
+</html>
