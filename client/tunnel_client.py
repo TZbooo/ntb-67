@@ -9,10 +9,11 @@
 
 import asyncio
 import sys
-from typing import Tuple
+
+from common.utils import close_writer, pipe
 
 
-POOL_SIZE = 5  # сколько data-соединений держим наготове
+POOL_SIZE = 5
 
 
 class NTBClient:
@@ -21,15 +22,15 @@ class NTBClient:
         self.server_port = server_port
         self.local_port = local_port
 
-    async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        """Хелпер: просто открыть TCP до сервера"""
+    async def open_connection(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        """Хелпер: просто открыть TCP до сервера."""
         return await asyncio.open_connection(self.server_host, self.server_port)
 
     async def start(self) -> None:
         while True:
             try:
                 await self._start()
-            except (ConnectionRefusedError, OSError, asyncio.CancelledError) as e:
+            except (ConnectionRefusedError, OSError) as e:
                 print(f"❌ Соединение разорвано: {e}. Новая попытка через 5 секунд...")
                 await asyncio.sleep(5)
 
@@ -73,11 +74,7 @@ class NTBClient:
         except Exception as e:
             print(f"💥 Ошибка: {e}")
         finally:
-            ctrl_writer.close()
-            try:
-                await ctrl_writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(ctrl_writer)
 
     async def open_data_connection(self) -> None:
         """
@@ -94,8 +91,8 @@ class NTBClient:
         writer.write(b'D')
         await writer.drain()
 
-        # Ждём первых байт от сервера (это будет HTTP-запрос от браузера)
-        # Соединение просто висит в ожидании — это нормально
+        # Ждём первых байт от сервера (это будет HTTP-запрос от браузера).
+        # Соединение просто висит в ожидании — это нормально.
         try:
             first_chunk = await reader.read(4096)
             if not first_chunk:
@@ -106,39 +103,23 @@ class NTBClient:
         # Получили данные — проксируем на локальный порт
         await self.proxy_to_local(reader, writer, first_chunk)
 
-    async def proxy_to_local(self, server_reader: asyncio.StreamReader, server_writer: asyncio.StreamWriter, first_chunk: bytes) -> None:
-        """Проксирует трафик между сервером и localhost"""
+    async def proxy_to_local(
+        self,
+        server_reader: asyncio.StreamReader,
+        server_writer: asyncio.StreamWriter,
+        first_chunk: bytes,
+    ) -> None:
+        """Проксирует трафик между сервером и localhost."""
         try:
             local_reader, local_writer = await asyncio.open_connection(
                 '127.0.0.1', self.local_port
             )
         except Exception:
             print(f"❌ localhost:{self.local_port} не отвечает!")
-            server_writer.close()
-            try:
-                await server_writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(server_writer)
             return
 
-        async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-            try:
-                while True:
-                    data = await reader.read(4096)
-                    if not data:
-                        break
-                    writer.write(data)
-                    await writer.drain()
-            except Exception:
-                pass
-            finally:
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
-
-        # Отправляем первый чанк который уже прочитали
+        # Отправляем первый чанк, который уже прочитали
         local_writer.write(first_chunk)
         await local_writer.drain()
 
@@ -147,8 +128,8 @@ class NTBClient:
             pipe(local_reader, server_writer)
         )
 
-    # Фоновая задача на клиенте
     async def start_heartbeat(self, writer: asyncio.StreamWriter) -> None:
+        """Фоновая задача: шлёт PING каждые 10 секунд."""
         try:
             while True:
                 await asyncio.sleep(10)
@@ -159,8 +140,8 @@ class NTBClient:
 
 
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else 'localhost'
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 4443
+    host  = sys.argv[1] if len(sys.argv) > 1 else 'localhost'
+    port  = int(sys.argv[2]) if len(sys.argv) > 2 else 4443
     local = int(sys.argv[3]) if len(sys.argv) > 3 else 5000
 
     asyncio.run(NTBClient(host, port, local).start())

@@ -9,11 +9,13 @@
 
 import asyncio
 
+from common.utils import close_writer, pipe
+
 
 class NTBServer:
     def __init__(self):
-        # Очередь готовых data-соединений от клиента
-        # Клиент кладёт сюда соединения заранее, сервер забирает по мере надобности
+        # Очередь готовых data-соединений от клиента.
+        # Клиент кладёт сюда соединения заранее, сервер забирает по мере надобности.
         self.data_connections = asyncio.Queue()
         self.control_writer = None
 
@@ -35,7 +37,11 @@ class NTBServer:
                 public_server.serve_forever()
             )
 
-    async def handle_tunnel_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_tunnel_connection(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
         """
         Все соединения от клиента приходят сюда.
         Первый байт — тип соединения:
@@ -49,19 +55,19 @@ class NTBServer:
         elif conn_type == b'D':
             await self.handle_data(reader, writer)
         else:
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(writer)
 
-    async def handle_control(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        """Управляющее соединение — живёт всё время пока клиент подключён"""
+    async def handle_control(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        """Управляющее соединение — живёт всё время пока клиент подключён."""
         print("🔗 Клиент подключился (управляющий канал).")
         self.control_writer = writer
 
         try:
-            # Читаем heartbeat-пинги от клиента чтобы знать что он жив
+            # Читаем heartbeat-пинги от клиента, чтобы знать что он жив
             while True:
                 data = await reader.read(16)
                 if not data:
@@ -75,13 +81,14 @@ class NTBServer:
         finally:
             print("❌ Клиент отключился.")
             self.control_writer = None
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception:
-                pass
+            # [ИЗМЕНЕНО] Вместо 4 строк — вызов утилиты close_writer()
+            await close_writer(writer)
 
-    async def handle_data(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_data(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
         """
         Клиент заранее открывает N таких соединений и они висят в очереди.
         Когда придёт браузер — сервер возьмёт одно из них.
@@ -90,17 +97,17 @@ class NTBServer:
         # Кладём (reader, writer) в queue — они будут ждать браузера
         await self.data_connections.put((reader, writer))
 
-    async def handle_public_traffic(self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter) -> None:
-        """Браузер постучался на :8000"""
+    async def handle_public_traffic(
+        self,
+        web_reader: asyncio.StreamReader,
+        web_writer: asyncio.StreamWriter,
+    ) -> None:
+        """Браузер постучался на :8000."""
         print("🌐 Входящий HTTP-запрос!")
 
         if not self.control_writer:
             print("⚠️  Нет клиента. Сбрасываем запрос.")
-            web_writer.close()
-            try:
-                await web_writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(web_writer)
             return
 
         # Просим клиента добавить ещё одно data-соединение взамен того что возьмём
@@ -109,11 +116,7 @@ class NTBServer:
             await self.control_writer.drain()
         except Exception:
             print("❌ Не смогли достучаться до клиента.")
-            web_writer.close()
-            try:
-                await web_writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(web_writer)
             return
 
         # Ждём data-соединение из пула (клиент должен прислать быстро)
@@ -124,35 +127,21 @@ class NTBServer:
             )
         except asyncio.TimeoutError:
             print("⏱️  Клиент не прислал data-соединение вовремя.")
-            web_writer.close()
-            try:
-                await web_writer.wait_closed()
-            except Exception:
-                pass
+            await close_writer(web_writer)
             return
 
         print("🔀 Мост установлен, качаем байты...")
         await self.bridge(web_reader, web_writer, data_reader, data_writer)
 
-    async def bridge(self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter, data_reader: asyncio.StreamReader, data_writer: asyncio.StreamWriter) -> None:
-        """Двусторонняя перекачка байт между браузером и клиентом"""
-        async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-            try:
-                while True:
-                    chunk = await reader.read(4096)
-                    if not chunk:
-                        break
-                    writer.write(chunk)
-                    await writer.drain()
-            except Exception:
-                pass
-            finally:
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
-
+    async def bridge(
+        self,
+        web_reader: asyncio.StreamReader,
+        web_writer: asyncio.StreamWriter,
+        data_reader: asyncio.StreamReader,
+        data_writer: asyncio.StreamWriter,
+    ) -> None:
+        """Двусторонняя перекачка байт между браузером и клиентом."""
+        # из верхнего уровня файла, которая теперь общая для сервера и клиента.
         await asyncio.gather(
             pipe(web_reader, data_writer),   # браузер → клиент
             pipe(data_reader, web_writer)    # клиент → браузер
