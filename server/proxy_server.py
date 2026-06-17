@@ -13,9 +13,11 @@
 распределяет поддомены между клиентами, парсит входящие HTTP-заголовки Host
 и маршрутизирует трафик от Nginx к соответствующим туннелям.
 """
-
+import secrets
 import asyncio
+
 from common.utils import close_writer, pipe
+
 
 class NTBServer:
     """Сервер туннелирования, координирующий трафик на основе поддоменов."""
@@ -46,69 +48,49 @@ class NTBServer:
     async def handle_client_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        """Обрабатывает входящие технические соединения от NTBClient.
-        
-        Определяет тип подключения (INIT для управления или DATA для трафика)
-        и регистрирует его за соответствующим поддоменом.
-        """
+        """Обрабатывает служебные подключения от туннель-клиента."""
         try:
-            # Читаем строку идентификации (например, "INIT:my-app\n" или "DATA:my-app\n")
-            auth_line = await reader.readline()
-            if not auth_line:
-                await close_writer(writer)
+            # Читаем приветственное сообщение от клиента (например, "INIT\n")
+            line_bytes = await reader.readline()
+            if not line_bytes:
                 return
+            
+            line = line_bytes.decode('utf-8').strip()
 
-            auth_str = auth_line.decode('utf-8').strip()
-            if ":" not in auth_str:
-                await close_writer(writer)
-                return
+            # Если клиент запрашивает инициализацию нового туннеля
+            if line == "INIT":
+                # Генерируем уникальный случайный поддомен (16 символов)
+                subdomain = secrets.token_hex(8)
+                while subdomain in self.active_tunnels:
+                    subdomain = secrets.token_hex(8)
 
-            conn_type, subdomain = auth_str.split(":", 1)
-            subdomain = subdomain.lower()
-
-            if conn_type == "INIT":
-                # Регистрация нового туннеля
-                if subdomain in self.active_tunnels:
-                    print(f"⚠️ Поддомен {subdomain} уже занят. Отклоняем.")
-                    writer.write(b"ERROR: Subdomain already in use\n")
-                    await writer.drain()
-                    await close_writer(writer)
-                    return
-
+                print(f"🚀 Регистрируем новый туnнель для поддомена: {subdomain}")
+                
                 self.active_tunnels[subdomain] = {
                     'control': writer,
                     'data_queue': asyncio.Queue()
                 }
-                writer.write(b"OK\n")
+
+                # Отправляем сгенерированный поддомен обратно клиенту
+                writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
-                print(f"💚 Туннель зарегистрирован: {subdomain}.24tunl.ru")
 
-                # Держим соединение активным (ожидаем PING или разрыв)
-                try:
-                    while True:
-                        line = await reader.readline()
-                        if not line:
-                            break
-                        # Логика Heartbeat (обработка PING)
-                        if line.strip() == b'PING':
-                            pass 
-                except Exception:
-                    pass
-                finally:
-                    print(f"💔 Туннель отключился: {subdomain}.24tunl.ru")
-                    self.active_tunnels.pop(subdomain, None)
-                    await close_writer(writer)
+                # Запускаем пинг-понг, чтобы соединение не разрывалось
+                await self.start_heartbeat(reader, subdomain)
 
-            elif conn_type == "DATA":
-                # Клиент прислал сокет в пул для прокачки данных
+            # Если клиент открыл сокет для передачи данных трафика
+            elif line.startswith("DATA:"):
+                subdomain = line.split(":", 1)[1].strip()
                 if subdomain in self.active_tunnels:
                     await self.active_tunnels[subdomain]['data_queue'].put((reader, writer))
+                    print(f"📦 Сокет данных добавлен в пул для поддомена: {subdomain}")
                 else:
-                    await close_writer(writer)
+                    print(f"⚠️ Токен данных для неизвестного поддомена: {subdomain}")
+                    close_writer(writer)
 
         except Exception as e:
-            print(f"❌ Ошибка при обработке соединения клиента: {e}")
-            await close_writer(writer)
+            print(f"❌ Ошибка при обработке клиента: {e}")
+            close_writer(writer)
 
     async def handle_web_request(
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
@@ -194,6 +176,7 @@ class NTBServer:
             pipe(web_reader, data_writer),
             pipe(data_reader, web_writer)
         )
+
 
 if __name__ == "__main__":
     asyncio.run(NTBServer().start())

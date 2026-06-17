@@ -14,59 +14,78 @@
 """
 
 import asyncio
+
 from common.utils import close_writer, pipe
 
 
 class NTBClient:
-    """Клиент туннелирования с поддержкой именованных поддоменов."""
+    """Клиент туннелирования с поддержкой динамических поддоменов."""
 
-    def __init__(self, server_host: str, server_port: int, local_port: int, subdomain: str):
+    def __init__(self, server_host: str, server_port: int, local_port: int) -> None:
         """Инициализирует NTBClient."""
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
-        self.subdomain = subdomain.lower()
+        self.subdomain = None
 
     async def open_connection(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Хелпер для быстрого открытия TCP-соединения до сервера."""
         return await asyncio.open_connection(self.server_host, self.server_port)
 
     async def start(self) -> None:
-        """Запускает основной цикл управляющего соединения и пула."""
+        """Запускает бесконечный цикл удержания управляющего соединения."""
         while True:
             try:
-                print(f"⏳ Подключение к серверу {self.server_host}:{self.server_port}...")
-                reader, writer = await self.open_connection()
-
-                # Шаг 1: Авторизация поддомена
-                writer.write(f"INIT:{self.subdomain}\n".encode('utf-8'))
-                await writer.drain()
-
-                status = await reader.readline()
-                if status.strip() != b"OK":
-                    print(f"❌ Сервер отклонил регистрацию: {status.decode().strip()}")
-                    await close_writer(writer)
-                    await asyncio.sleep(5)
-                    continue
-
-                print(f"🎉 Туннель успешно запущен на https://{self.subdomain}.24tunl.ru")
-
-                # Запуск таска для поддержания соединения (Heartbeat)
-                heartbeat_task = asyncio.create_task(self.start_heartbeat(writer))
-
-                # Шаг 2: Ожидание команд от сервера на создание дата-сокетов
-                while True:
-                    cmd = await reader.readline()
-                    if not cmd:
-                        break  # Сервер закрыл коннект
-
-                    if cmd.strip() == b"REQUEST_CONN":
-                        # Сервер просит сокет под новый HTTP-запрос — создаем его асинхронно
-                        asyncio.create_task(self.spawn_data_connection())
-
+                await self._start_tunnel()
             except Exception as e:
-                print(f"⚠️ Ошибка сети: {e}. Повтор через 5 секунд...")
+                print(f"❌ Ошибка соединения с сервером: {e}")
+                print("⏳ Переподключение через 5 секунд...")
                 await asyncio.sleep(5)
+
+    async def _start_tunnel(self) -> None:
+        """Устанавливает управляющий канал и слушает команды от сервера."""
+        reader, writer = await self.open_connection()
+        
+        # Отправляем запрос на инициализацию без указания поддомена
+        writer.write(b"INIT\n")
+        await writer.drain()
+
+        # Ждем ответ от сервера с назначенным UUID/хэшем
+        response_bytes = await reader.readline()
+        if not response_bytes:
+            close_writer(writer)
+            return
+
+        response = response_bytes.decode('utf-8').strip()
+        if response.startswith("ASSIGNED:"):
+            self.subdomain = response.split(":", 1)[1].strip()
+            
+            print("\n" + "="*50)
+            print(f"🎉 Туннель успешно запущен!")
+            print(f"🔗 Публичный адрес:  https://{self.subdomain}.24tunl.ru")
+            print(f"🏠 Локальный порт:   http://127.0.0.1:{self.local_port}")
+            print("="*50 + "\n")
+        else:
+            print("❌ Сервер отказал в инициализации туннеля.")
+            close_writer(writer)
+            return
+
+        # Запускаем фоновую задачу для пинга
+        heartbeat_task = asyncio.create_task(self.start_heartbeat(writer))
+
+        try:
+            while True:
+                line_bytes = await reader.readline()
+                if not line_bytes:
+                    break
+
+                cmd = line_bytes.decode('utf-8').strip()
+                if cmd == "REQUEST_CONN":
+                    # Ссылаемся на правильное имя метода: spawn_data_connection
+                    asyncio.create_task(self.spawn_data_connection())
+        finally:
+            heartbeat_task.cancel()
+            close_writer(writer)
 
     async def spawn_data_connection(self) -> None:
         """Создает новый выделенный дата-канал для конкретного HTTP-запроса."""
@@ -101,10 +120,11 @@ class NTBClient:
         except Exception:
             pass
 
+
 if __name__ == "__main__":
+    # Убрали лишний аргумент subdomain="test" из инициализации
     asyncio.run(NTBClient(
         server_host="24tunl.ru",
         server_port=9000,
-        local_port=8000,
-        subdomain="test"
+        local_port=8000
     ).start())
