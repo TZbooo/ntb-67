@@ -53,7 +53,7 @@ class NTBClient:
         # Ждем ответ от сервера с назначенным UUID/хэшем
         response_bytes = await reader.readline()
         if not response_bytes:
-            close_writer(writer)
+            await close_writer(writer)
             return
 
         response = response_bytes.decode('utf-8').strip()
@@ -67,7 +67,7 @@ class NTBClient:
             print("="*50 + "\n")
         else:
             print("❌ Сервер отказал в инициализации туннеля.")
-            close_writer(writer)
+            await close_writer(writer)
             return
 
         # Запускаем фоновую задачу для пинга
@@ -85,7 +85,7 @@ class NTBClient:
                     asyncio.create_task(self.spawn_data_connection())
         finally:
             heartbeat_task.cancel()
-            close_writer(writer)
+            await close_writer(writer)
 
     async def spawn_data_connection(self) -> None:
         """Создает новый выделенный дата-канал для конкретного HTTP-запроса."""
