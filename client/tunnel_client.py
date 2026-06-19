@@ -23,6 +23,7 @@ class NTBClient:
 
     def __init__(self, server_host: str, server_port: int, local_port: int) -> None:
         """Инициализирует NTBClient."""
+
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
@@ -30,10 +31,12 @@ class NTBClient:
 
     async def open_connection(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Хелпер для быстрого открытия TCP-соединения до сервера."""
+
         return await asyncio.open_connection(self.server_host, self.server_port)
 
     async def start(self) -> None:
         """Запускает бесконечный цикл удержания управляющего соединения."""
+
         while True:
             try:
                 await self._start_tunnel()
@@ -44,6 +47,7 @@ class NTBClient:
 
     async def _start_tunnel(self) -> None:
         """Устанавливает управляющий канал и слушает команды от сервера."""
+
         reader, writer = await self.open_connection()
         
         if self.subdomain:
@@ -94,6 +98,7 @@ class NTBClient:
 
     async def spawn_data_connection(self) -> None:
         """Создает новый выделенный дата-канал для конкретного HTTP-запроса."""
+
         try:
             # Открываем сокет к серверу туннелирования
             server_reader, server_writer = await self.open_connection()
@@ -117,6 +122,7 @@ class NTBClient:
 
     async def start_heartbeat(self, writer: asyncio.StreamWriter) -> None:
         """Каждые 10 секунд шлет PING, защищая сокет от молчаливого дропа файрволами."""
+
         try:
             while True:
                 await asyncio.sleep(10)

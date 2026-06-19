@@ -11,6 +11,8 @@ import asyncio
 
 
 async def close_writer(writer: asyncio.StreamWriter) -> None:
+    """Безопасно закрывает StreamWriter, игнорируя возможные ошибки."""
+
     writer.close()
     try:
         await writer.wait_closed()
@@ -20,6 +22,7 @@ async def close_writer(writer: asyncio.StreamWriter) -> None:
 
 async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     """Односторонняя перекачка байт reader → writer до EOF или ошибки."""
+
     try:
         while True:
             data = await reader.read(4096)

@@ -33,11 +33,13 @@ class NTBServer:
 
     def __init__(self):
         """Инициализирует NTBServer с реестром активных поддоменов."""
+        
         self.secret_key = os.environ['SECRET_KEY'].encode()
         self.active_tunnels: dict[str, dict] = {}
 
     async def start(self) -> None:
         """Запускает управляющий сокет для клиентов и публичный веб-сервер для Nginx."""
+        
         # Порт 9000 — для подключений самих NTBClient
         control_server = await asyncio.start_server(
             self.handle_client_connection, '0.0.0.0', 9000
@@ -58,6 +60,7 @@ class NTBServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         """Обрабатывает служебные подключения от туннель-клиента."""
+        
         try:
             # Читаем приветственное сообщение от клиента (например, "INIT\n")
             line_bytes = await reader.readline()
@@ -115,6 +118,7 @@ class NTBServer:
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
     ) -> None:
         """Принимает HTTP-запрос от Nginx, парсит Host и направляет в нужный туннель."""
+        
         try:
             # Читаем первый чанк данных, чтобы вытащить HTTP-заголовки
             header_chunk = await web_reader.readuntil(b'\r\n\r\n')
@@ -169,6 +173,7 @@ class NTBServer:
 
     def _extract_subdomain(self, header_chunk: bytes) -> str | None:
         """Вспомогательный метод для парсинга поддомена из HTTP-заголовков."""
+        
         try:
             headers_text = header_chunk.decode('utf-8', errors='ignore')
             for line in headers_text.split('\r\n'):
@@ -192,6 +197,7 @@ class NTBServer:
         data_writer: asyncio.StreamWriter,
     ) -> None:
         """Двусторонняя перекачка байт между Nginx и клиентом."""
+        
         await asyncio.gather(
             pipe(web_reader, data_writer),
             pipe(data_reader, web_writer)
@@ -199,6 +205,7 @@ class NTBServer:
 
     def _generate_free_subdomain(self) -> str:
         """Генерирует бесплатный случайный поддомен с криптографической подписью."""
+        
         rand_bytes = secrets.token_hex(4)  # 8 символов рандома
         # Делаем короткую подпись (первые 8 символов sha256) для компактности адреса
         signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
@@ -206,6 +213,7 @@ class NTBServer:
 
     def _is_valid_free_subdomain(self, subdomain: str) -> bool:
         """Проверяет, был ли этот бесплатный поддомен сгенерирован нашим сервером."""
+        
         if "-" not in subdomain:
             return False
 
