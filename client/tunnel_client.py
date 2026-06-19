@@ -46,9 +46,14 @@ class NTBClient:
         """Устанавливает управляющий канал и слушает команды от сервера."""
         reader, writer = await self.open_connection()
         
-        # Отправляем запрос на инициализацию без указания поддомена
-        writer.write(b"INIT\n")
-        await writer.drain()
+        if self.subdomain:
+            # Отправляем запрос на инициализацию с указанием поддомена
+            writer.write(f"INIT:{self.subdomain}\n".encode('utf-8'))
+            await writer.drain()
+        else:
+            # Отправляем запрос на инициализацию без указания поддомена
+            writer.write(b"INIT\n")
+            await writer.drain()
 
         # Ждем ответ от сервера с назначенным UUID/хэшем
         response_bytes = await reader.readline()
