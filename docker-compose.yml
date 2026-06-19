@@ -1,4 +1,14 @@
 services:
+  ntb-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ntb-proxy-server
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    restart: always
+
   nginx:
     image: nginx:latest
     container_name: nginx-proxy
@@ -11,4 +21,6 @@ services:
       - /etc/letsencrypt:/etc/nginx/ssl:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - ntb-server
     restart: always

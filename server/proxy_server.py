@@ -13,10 +13,19 @@
 распределяет поддомены между клиентами, парсит входящие HTTP-заголовки Host
 и маршрутизирует трафик от Nginx к соответствующим туннелям.
 """
+
+import os
+import hmac
+import hashlib
 import secrets
 import asyncio
 
+from dotenv import load_dotenv
+
 from common.utils import close_writer, pipe
+
+
+load_dotenv()
 
 
 class NTBServer:
@@ -24,7 +33,7 @@ class NTBServer:
 
     def __init__(self):
         """Инициализирует NTBServer с реестром активных поддоменов."""
-        # Структура: { 'subdomain': { 'control': writer, 'data_queue': asyncio.Queue } }
+        self.secret_key = os.environ['SECRET_KEY'].encode()
         self.active_tunnels: dict[str, dict] = {}
 
     async def start(self) -> None:
@@ -54,23 +63,36 @@ class NTBServer:
             line_bytes = await reader.readline()
             if not line_bytes:
                 return
-            
             line = line_bytes.decode('utf-8').strip()
 
             # Если клиент запрашивает инициализацию нового туннеля
-            if line == "INIT":
-                # Генерируем уникальный случайный поддомен (16 символов)
-                subdomain = secrets.token_hex(16)
-                while subdomain in self.active_tunnels:
-                    subdomain = secrets.token_hex(16)
+            if line == "INIT" or line.startswith("INIT:"):
+                subdomain = None
 
-                print(f"🚀 Регистрируем новый туnнель для поддомена: {subdomain}")
-                
-                self.active_tunnels[subdomain] = {
-                    'control': writer,
-                    'data_queue': asyncio.Queue()
-                }
+                if line.startswith("INIT:"):
+                    requested_subdomain = line.split(":", 1)[1].strip()
+                    if self._is_valid_free_subdomain(requested_subdomain):
+                        if requested_subdomain in self.active_tunnels:
+                            subdomain = requested_subdomain
+                            print(f"✅ Возобнавляем существующий туннель: {subdomain}")
+                        else:
+                            # Домен наш, но сессия в памяти уже стерлась (клиент долго спал)
+                            # Создаем структуру заново с тем же именем
+                            subdomain = requested_subdomain
+                            self.active_tunnels[subdomain] = {'data_queue': asyncio.Queue()}
+                            print(f"⏳ Сессия истёкла, но домен валиден. Пересоздаем туннель: {subdomain}")
+                    else:
+                        print(f"⚠️ Клиент пытается захватить домен (хакер): {requested_subdomain}")
+                if not subdomain:
+                    print('000000')
+                    subdomain = self._generate_free_subdomain()  # Генерируем новый поддомен для клиента
+                    print(subdomain)
+                    while subdomain in self.active_tunnels:
+                        subdomain = self._generate_free_subdomain()
 
+                    print(f"🚀 Регистрируем новый бесплатный туннель: {subdomain}")
+                    self.active_tunnels[subdomain] = {'data_queue': asyncio.Queue()}
+                self.active_tunnels[subdomain]['control'] = writer
                 # Отправляем сгенерированный поддомен обратно клиенту
                 writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
@@ -102,6 +124,7 @@ class NTBServer:
 
         # Ищем заголовок Host в байтиках
         subdomain = self._extract_subdomain(header_chunk)
+        print(subdomain)
 
         if not subdomain or subdomain not in self.active_tunnels:
             print(f"🚫 Запрос на неизвестный или оффлайн поддомен: {subdomain}.24tunl.ru")
@@ -173,6 +196,25 @@ class NTBServer:
             pipe(web_reader, data_writer),
             pipe(data_reader, web_writer)
         )
+
+    def _generate_free_subdomain(self) -> str:
+        """Генерирует бесплатный случайный поддомен с криптографической подписью."""
+        rand_bytes = secrets.token_hex(4)  # 8 символов рандома
+        # Делаем короткую подпись (первые 8 символов sha256) для компактности адреса
+        signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
+        return f"{rand_bytes}-{signature}"
+
+    def _is_valid_free_subdomain(self, subdomain: str) -> bool:
+        """Проверяет, был ли этот бесплатный поддомен сгенерирован нашим сервером."""
+        if "-" not in subdomain:
+            return False
+
+        rand_bytes, signature = subdomain.split("-", 1)
+        print([rand_bytes, signature])
+        expected_signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
+        
+        # hmac.compare_digest защищает от атак по времени (timing attacks)
+        return hmac.compare_digest(signature, expected_signature)
 
 
 if __name__ == "__main__":
