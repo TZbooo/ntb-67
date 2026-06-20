@@ -1,31 +1,25 @@
-# ntb-67
+# ntb-67 — Asyncio Tunneling Proxy Client
 
-[English](#english) | [Русский](#русский)
-
----
-
-## English
-
-### 🚧 Under Construction (Work in Progress)
-
-This project is currently in the **active development stage**. It is essentially a clean canvas where core mechanics, architecture, and features are being built from scratch. 
-
-* **No docs yet:** We haven't written detailed instructions, setup guides, or user manuals because everything is shifting and changing daily.
-* **No UX guarantees:** The project is absolutely not ready for end-users or a smooth user experience. Expect bugs, broken endpoints, and incomplete features.
-* **For developers:** If you stumbled upon this repository, feel free to look around the source code, but do so at your own risk. 
-
-As soon as the foundation becomes stable, a proper, comprehensive `README.md` with installation and usage instructions will be provided. Thanks for understanding!
+[![PyPI version](https://img.shields.io/pypi/v/ntb-67-client.svg)](https://pypi.org/project/ntb-67-client/)
+[![License](https://img.shields.io/badge/License-Source--Available-orange.svg)](LICENSE)
+[![Telegram Support](https://img.shields.io/badge/Telegram-Support-blue.svg?logo=telegram)](https://t.me/netbiom)
 
 ---
 
-## Русский
+## 🇷🇺 Русский
 
-### 🚧 В процессе разработки (Work in Progress)
+**ntb-67-client** — это легковесный асинхронный CLI-клиент на базе Python `asyncio`, предназначенный для быстрого проброса локальных портов в глобальную сеть. Современная и эффективная альтернатива таким инструментам, как *ngrok* и *localtunnel*.
 
-Этот проект сейчас находится в стадии **активной чистой разработки**. На данном этапе закладывается архитектура, базовая логика и ключевой функционал.
+> ⚠️ **Проект в стадии разработки (WIP):** Архитектура находится в состоянии активного тестирования. Стабильность версий не гарантируется, а документация будет дополняться по мере стабилизации API.
 
-* **Инструкций пока нет:** Мы намеренно не пишем подробные руководства по установке и настройке, так как кодовая база и структура проекта меняются каждый день.
-* **Никаких гарантий стабильности:** Проект абсолютно не готов для конечного пользователя (UX). Всё может ломаться, падать или быть недописанным — это нормальное состояние для текущего этапа.
-* **Для любопытных:** Если вы заглянули в этот репозиторий, вы можете изучить исходный код, но учитывайте, что «из коробки» сейчас ничего стабильно не работает.
+### ✨ Особенности
+* **Полная асинхронность:** Высокая производительность и низкое потребление ресурсов благодаря `asyncio`.
+* **Динамические поддомены:** Автоматическое выделение уникальных адресов на сервере маршрутизации.
+* **Автоматическое возобновление:** Устойчивость к кратковременным сбоям сети и сохранение сессии подключения.
 
-Как только проект обретет стабильную форму и базовый каркас будет готов, мы обязательно добавим полноценный `README.md` с инструкциями по запуску. Спасибо за понимание!
+### 🚀 Быстрый старт
+
+#### 1. Установка
+Установите пакет напрямую из PyPI:
+```bash
+pip install ntb-67-client
