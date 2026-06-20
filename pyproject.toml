@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ntb-67-client"
+version = "0.1.1"
+description = "Asyncio Tunneling Proxy Client — alternative for ngrok/localtunnel"
+readme = "README.md"
+authors = [
+    { name = "Timur Zolotov (netbiom)", email = "helloworldbooo@gmail.com" }
+]
+license = { text = "NTB-67 Source-Available Commercial License" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+dependencies = [] # Если появятся внешние библиотеки вроде httpx, пишите их сюда
+
+[project.urls]
+Homepage = "https://github.com/TZbooo/ntb-67"
+"Telegram Support" = "https://t.me/netbiom"
+
+[project.scripts]
+ntb-67-client = "client.tunnel_client:main"
+
+[tool.setuptools]
+packages = ["client", "common"]

@@ -13,7 +13,9 @@
 выделения дата-каналов и проброс входящих пакетов на локальный порт разработчика.
 """
 
+import argparse
 import asyncio
+import sys
 
 from common.utils import close_writer, pipe
 
@@ -132,10 +134,46 @@ class NTBClient:
             pass
 
 
+def main() -> None:
+    """Точка входа для консольного запуска утилиты."""
+
+    parser = argparse.ArgumentParser(
+        description="ntb-67 — Скоростной асинхронный туннель для локальных портов."
+    )
+    # Позиционный аргумент: порт локального веб-сервера
+    parser.add_argument(
+        "local_port",
+        type=int,
+        help="Локальный порт, который необходимо пробросить наружу (например, 8000)"
+    )
+    # Опциональный аргумент для смены хоста сервера туннелей
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="24tunl.ru",
+        help="Хост удаленного сервера NTB (дефолт: 24tunl.ru)"
+    )
+    # Опциональный аргумент для порта сервера туннелей
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9000,
+        help="Управляющий порт удаленного сервера NTB (дефолт: 9000)"
+    )
+
+    args = parser.parse_args()
+
+    try:
+        client = NTBClient(
+            server_host=args.host,
+            server_port=args.port,
+            local_port=args.local_port
+        )
+        asyncio.run(client.start())
+    except KeyboardInterrupt:
+        print("\n👋 Туннель закрыт пользователем. До встречи!")
+        sys.exit(0)
+
+
 if __name__ == "__main__":
-    # Убрали лишний аргумент subdomain="test" из инициализации
-    asyncio.run(NTBClient(
-        server_host="24tunl.ru",
-        server_port=9000,
-        local_port=8000
-    ).start())
+    main()
