@@ -19,6 +19,7 @@ import hmac
 import hashlib
 import secrets
 import asyncio
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
@@ -28,6 +29,14 @@ from common.utils import close_writer, pipe
 load_dotenv()
 
 
+@dataclass
+class TunnelSession:
+    """Представляет активную сессию туннеля клиента."""
+
+    data_queue: asyncio.Queue[tuple[asyncio.StreamReader, asyncio.StreamWriter]]
+    control: asyncio.StreamWriter | None = None
+
+
 class NTBServer:
     """Сервер туннелирования, координирующий трафик на основе поддоменов."""
 
@@ -35,7 +44,7 @@ class NTBServer:
         """Инициализирует NTBServer с реестром активных поддоменов."""
         
         self.secret_key = os.environ['SECRET_KEY'].encode()
-        self.active_tunnels: dict[str, dict] = {}
+        self.active_tunnels: dict[str, TunnelSession] = {}
 
     async def start(self) -> None:
         """Запускает управляющий сокет для клиентов и публичный веб-сервер для Nginx."""
@@ -82,7 +91,7 @@ class NTBServer:
                             # Домен наш, но сессия в памяти уже стерлась (клиент долго спал)
                             # Создаем структуру заново с тем же именем
                             subdomain = requested_subdomain
-                            self.active_tunnels[subdomain] = {'data_queue': asyncio.Queue()}
+                            self.active_tunnels[subdomain] = TunnelSession(data_queue=asyncio.Queue())
                             print(f"⏳ Сессия истёкла, но домен валиден. Пересоздаем туннель: {subdomain}")
                     else:
                         print(f"⚠️ Клиент пытается захватить домен (хакер): {requested_subdomain}")
@@ -94,8 +103,8 @@ class NTBServer:
                         subdomain = self._generate_free_subdomain()
 
                     print(f"🚀 Регистрируем новый бесплатный туннель: {subdomain}")
-                    self.active_tunnels[subdomain] = {'data_queue': asyncio.Queue()}
-                self.active_tunnels[subdomain]['control'] = writer
+                    self.active_tunnels[subdomain] = TunnelSession(data_queue=asyncio.Queue())
+                self.active_tunnels[subdomain].control = writer
                 # Отправляем сгенерированный поддомен обратно клиенту
                 writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
@@ -104,7 +113,7 @@ class NTBServer:
             elif line.startswith("DATA:"):
                 subdomain = line.split(":", 1)[1].strip()
                 if subdomain in self.active_tunnels:
-                    await self.active_tunnels[subdomain]['data_queue'].put((reader, writer))
+                    await self.active_tunnels[subdomain].data_queue.put((reader, writer))
                     print(f"📦 Сокет данных добавлен в пул для поддомена: {subdomain}")
                 else:
                     print(f"⚠️ Токен данных для неизвестного поддомена: {subdomain}")
@@ -147,9 +156,15 @@ class NTBServer:
 
         # Если туннель онлайн, просим у него DATA-соединение
         tunnel = self.active_tunnels[subdomain]
+        # Убедимся, что у туннеля есть управляющее соединение
+        if not tunnel.control:
+            print(f"❌ Управляющее соединение клиента {subdomain} отсутствует")
+            await close_writer(web_writer)
+            return
+
         try:
-            tunnel['control'].write(b"REQUEST_CONN\n")
-            await tunnel['control'].drain()
+            tunnel.control.write(b"REQUEST_CONN\n")
+            await tunnel.control.drain()
         except Exception:
             print(f"❌ Не смогли отправить команду запроса сокета клиенту {subdomain}")
             await close_writer(web_writer)
@@ -157,7 +172,7 @@ class NTBServer:
 
         try:
             data_reader, data_writer = await asyncio.wait_for(
-                tunnel['data_queue'].get(), timeout=5.0
+                tunnel.data_queue.get(), timeout=5.0
             )
         except asyncio.TimeoutError:
             print(f"⏱️ Клиент {subdomain} не успел выделить сокет под запрос.")
