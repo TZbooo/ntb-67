@@ -7,6 +7,7 @@ services:
     networks:
       - ntb-network
     restart: always
+    env_file: .env
 
   ntb-server:
     build:
@@ -21,6 +22,7 @@ services:
     networks:
       - ntb-network
     restart: always
+    env_file: .env
 
   nginx:
     image: nginx:latest
