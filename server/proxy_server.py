@@ -18,6 +18,7 @@ import asyncio
 
 from common.utils import close_writer, pipe
 from .models import TunnelRegistry
+from .http_utils import extract_subdomain
 from .security import generate_free_subdomain, is_valid_subdomain
 
 
@@ -138,7 +139,7 @@ class NTBServer:
             return
 
         # Ищем заголовок Host в байтиках
-        subdomain = self._extract_subdomain(header_chunk)
+        subdomain = extract_subdomain(header_chunk)
 
         if not subdomain or not self.active_tunnels.contains(subdomain):
             print(f"🚫 Запрос на неизвестный или оффлайн поддомен: {subdomain}.24tunl.ru")
@@ -186,24 +187,6 @@ class NTBServer:
 
         # Запускаем мост
         await self.bridge(web_reader, web_writer, data_reader, data_writer)
-
-    def _extract_subdomain(self, header_chunk: bytes) -> str | None:
-        """Вспомогательный метод для парсинга поддомена из HTTP-заголовков."""
-
-        try:
-            headers_text = header_chunk.decode('utf-8', errors='ignore')
-            for line in headers_text.split('\r\n'):
-                if line.lower().startswith('host:'):
-                    # Пример: "Host: app.24tunl.ru" -> "app.24tunl.ru"
-                    host_val = line.split(':', 1)[1].strip()
-                    # Вытаскиваем поддомен (все что до первой точки)
-                    if '.24tunl.ru' in host_val:
-                        return host_val.split('.24tunl.ru')[0].lower()
-                    # На случай локальных тестов через localhost:8000
-                    return host_val.split('.')[0].lower()
-        except Exception:
-            pass
-        return None
 
     async def bridge(
         self,
