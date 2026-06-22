@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0  # Используйте актуальную версию
+    hooks:
+      - id: trailing-whitespace  # Удаляет лишние пробелы на концах строк
+      - id: end-of-file-fixer    # Гарантирует пустую строку в конце файла
+      - id: check-yaml           # Проверяет синтаксис YAML-файлов
+      - id: check-added-large-files # Защищает от случайного коммита гигантских файлов
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4  # Актуальная версия Ruff
+    hooks:
+      # 1. Запуск линтера (находит ошибки, авто-исправляет то, что можно исправить)
+      - id: ruff
+        args: [ --fix ]
+      # 2. Запуск форматирования кода (приведение к единому стилю, аналог Black)
+      - id: ruff-format

@@ -27,3 +27,18 @@ ntb-67-client = "client.tunnel_client:main"
 
 [tool.setuptools]
 packages = ["client", "common"]
+
+[tool.ruff]
+line-length = 80
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # Ошибки и предупреждения pycodestyle
+    "F",       # Пропущенные импорты, неиспользованные переменные
+    "I",       # Авто-сортировка импортов (isort)
+    "D",       # Проверки докстрингов pydocstyle
+]
+ignore = [
+    "D203", "D212",  # Убираем конфликты стандартов докстрингов
+    "E501",          # Игнорируем слишком длинные строки (чтобы не ругался на лицензию в шапках)
+]
