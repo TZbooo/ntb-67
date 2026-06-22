@@ -14,23 +14,11 @@
 и маршрутизирует трафик от Nginx к соответствующим туннелям.
 """
 
-import time
-import hmac
-import hashlib
-import secrets
 import asyncio
-from dataclasses import dataclass
 
 from common.utils import close_writer, pipe
-from .config import SECRET_KEY, TUNNEL_LIVE_TIME_SECONDS
-
-
-@dataclass
-class TunnelSession:
-    """Представляет активную сессию туннеля клиента."""
-
-    data_queue: asyncio.Queue[tuple[asyncio.StreamReader, asyncio.StreamWriter]]
-    control: asyncio.StreamWriter | None = None
+from .models import TunnelRegistry
+from .security import generate_free_subdomain, is_valid_subdomain
 
 
 class NTBServer:
@@ -39,8 +27,7 @@ class NTBServer:
     def __init__(self):
         """Инициализирует NTBServer с реестром активных поддоменов."""
         
-        self.secret_key = SECRET_KEY.encode()  # Ключ для генерации и проверки поддоменов
-        self.active_tunnels: dict[str, TunnelSession] = {}
+        self.active_tunnels = TunnelRegistry()
 
     async def start(self) -> None:
         """Запускает управляющий сокет для клиентов и публичный веб-сервер для Nginx."""
@@ -79,26 +66,26 @@ class NTBServer:
             if line == "INIT" or line.startswith("INIT:"):
                 if line.startswith("INIT:"):
                     requested_subdomain = line.split(":", 1)[1].strip()
-                    if self._is_valid_free_subdomain(requested_subdomain):
-                        if requested_subdomain in self.active_tunnels:
+                    if is_valid_subdomain(requested_subdomain):
+                        if self.active_tunnels.contains(requested_subdomain):
                             subdomain = requested_subdomain
                             print(f"✅ Возобнавляем существующий туннель: {subdomain}")
                         else:
                             # Домен наш, но сессия в памяти уже стерлась (клиент долго спал)
                             # Создаем структуру заново с тем же именем
                             subdomain = requested_subdomain
-                            self.active_tunnels[subdomain] = TunnelSession(data_queue=asyncio.Queue())
+                            self.active_tunnels.register(subdomain)
                             print(f"⏳ Сессия истёкла, но домен валиден. Пересоздаем туннель: {subdomain}")
                     else:
                         print(f"⚠️ Клиент пытается захватить домен (хакер): {requested_subdomain}")
                 if not subdomain:
-                    subdomain = self._generate_free_subdomain()  # Генерируем новый поддомен для клиента
-                    while subdomain in self.active_tunnels:
-                        subdomain = self._generate_free_subdomain()
+                    subdomain = generate_free_subdomain()  # Генерируем новый поддомен для клиента
+                    while self.active_tunnels.contains(subdomain):
+                        subdomain = generate_free_subdomain()
 
                     print(f"🚀 Регистрируем новый бесплатный туннель: {subdomain}")
-                    self.active_tunnels[subdomain] = TunnelSession(data_queue=asyncio.Queue())
-                self.active_tunnels[subdomain].control = writer
+                    self.active_tunnels.register(subdomain)
+                self.active_tunnels.activate_control(subdomain, writer)
                 # Отправляем сгенерированный поддомен обратно клиенту
                 writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
@@ -115,8 +102,8 @@ class NTBServer:
             # Если клиент открыл сокет для передачи данных трафика
             elif line.startswith("DATA:"):
                 subdomain = line.split(":", 1)[1].strip()
-                if subdomain in self.active_tunnels:
-                    await self.active_tunnels[subdomain].data_queue.put((reader, writer))
+                if self.active_tunnels.contains(subdomain):
+                    await self.active_tunnels.get(subdomain).data_queue.put((reader, writer))
                     print(f"📦 Сокет данных добавлен в пул для поддомена: {subdomain}")
                 else:
                     print(f"⚠️ Токен данных для неизвестного поддомена: {subdomain}")
@@ -134,15 +121,15 @@ class NTBServer:
             if subdomain and line.startswith("INIT"):
                 print(self.active_tunnels)
                 print(f"🧹 Очистка ресурсов для поддомена: {subdomain}")
-                if subdomain in self.active_tunnels:
-                    del self.active_tunnels[subdomain]
+                if self.active_tunnels.contains(subdomain):
+                    self.active_tunnels.remove(subdomain)
                 await close_writer(writer)
 
     async def handle_web_request(
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
     ) -> None:
         """Принимает HTTP-запрос от Nginx, парсит Host и направляет в нужный туннель."""
-        
+
         try:
             # Читаем первый чанк данных, чтобы вытащить HTTP-заголовки
             header_chunk = await web_reader.readuntil(b'\r\n\r\n')
@@ -153,7 +140,7 @@ class NTBServer:
         # Ищем заголовок Host в байтиках
         subdomain = self._extract_subdomain(header_chunk)
 
-        if not subdomain or subdomain not in self.active_tunnels:
+        if not subdomain or not self.active_tunnels.contains(subdomain):
             print(f"🚫 Запрос на неизвестный или оффлайн поддомен: {subdomain}.24tunl.ru")
             # Отдаем красивую заглушку 404
             html_body = b"<h1>404 Tunnel Not Found</h1><p>ntb-67: Active tunnel for this subdomain not found.</p>"
@@ -169,7 +156,7 @@ class NTBServer:
             return
 
         # Если туннель онлайн, просим у него DATA-соединение
-        tunnel = self.active_tunnels[subdomain]
+        tunnel = self.active_tunnels.get(subdomain)
         # Убедимся, что у туннеля есть управляющее соединение
         if not tunnel.control:
             print(f"❌ Управляющее соединение клиента {subdomain} отсутствует")
@@ -202,7 +189,7 @@ class NTBServer:
 
     def _extract_subdomain(self, header_chunk: bytes) -> str | None:
         """Вспомогательный метод для парсинга поддомена из HTTP-заголовков."""
-        
+
         try:
             headers_text = header_chunk.decode('utf-8', errors='ignore')
             for line in headers_text.split('\r\n'):
@@ -231,61 +218,6 @@ class NTBServer:
             pipe(web_reader, data_writer),
             pipe(data_reader, web_writer)
         )
-
-    def _generate_free_subdomain(self) -> str:
-        """Генерирует случайный поддомен с временной меткой и криптографической подписью.
-        
-        Формат: {rand_bytes}-{hex_timestamp}-{signature}
-        """
-
-        rand_bytes = secrets.token_hex(4)  # 8 символов рандома
-        
-        # Берем текущее время (округляем до секунд) и переводим в hex
-        timestamp_hex = hex(int(time.time()))[2:]  # например: '665af380'
-        
-        # Объединяем полезную нагрузку, которую будем защищать подписью
-        payload = f"{rand_bytes}:{timestamp_hex}"
-        
-        # Подписываем весь payload целиком
-        signature = hmac.new(
-            self.secret_key, payload.encode(), hashlib.sha256
-        ).hexdigest()[:8]
-        
-        return f"{rand_bytes}-{timestamp_hex}-{signature}"
-
-    def _is_valid_free_subdomain(self, subdomain: str) -> bool:
-        """Проверяет валидность поддомена и то, что он был создан менее 1 часа назад."""
-        
-        # Проверяем структуру (теперь должно быть ровно два дефиса)
-        if subdomain.count("-") != 2:
-            return False
-
-        rand_bytes, timestamp_hex, signature = subdomain.split("-", 2)
-        
-        # 1. Сначала проверяем криптографическую подпись
-        payload = f"{rand_bytes}:{timestamp_hex}"
-        expected_signature = hmac.new(
-            self.secret_key, payload.encode(), hashlib.sha256
-        ).hexdigest()[:8]
-        
-        # Защита от timing-атак: если подпись левая — сразу выходим
-        if not hmac.compare_digest(signature, expected_signature):
-            return False
-
-        # 2. Подпись верна, теперь проверяем время жизни (Time-to-Live)
-        try:
-            # Переводим hex-таймстамп обратно в int (секунды)
-            created_time = int(timestamp_hex, 16)
-        except ValueError:
-            return False  # На случай, если в hex_timestamp передали невалидные символы
-
-        current_time = int(time.time())
-
-        if current_time - created_time > TUNNEL_LIVE_TIME_SECONDS:
-            print(f"⏱️ Поддомен {subdomain} просрочен (создан более {TUNNEL_LIVE_TIME_SECONDS} часов назад)")
-            return False
-
-        return True
 
 
 if __name__ == "__main__":
