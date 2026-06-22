@@ -14,6 +14,7 @@
 и маршрутизирует трафик от Nginx к соответствующим туннелям.
 """
 
+import time
 import hmac
 import hashlib
 import secrets
@@ -21,7 +22,7 @@ import asyncio
 from dataclasses import dataclass
 
 from common.utils import close_writer, pipe
-from .config import SECRET_KEY
+from .config import SECRET_KEY, TUNNEL_LIVE_TIME_SECONDS
 
 
 @dataclass
@@ -232,24 +233,59 @@ class NTBServer:
         )
 
     def _generate_free_subdomain(self) -> str:
-        """Генерирует бесплатный случайный поддомен с криптографической подписью."""
+        """Генерирует случайный поддомен с временной меткой и криптографической подписью.
         
+        Формат: {rand_bytes}-{hex_timestamp}-{signature}
+        """
+
         rand_bytes = secrets.token_hex(4)  # 8 символов рандома
-        # Делаем короткую подпись (первые 8 символов sha256) для компактности адреса
-        signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
-        return f"{rand_bytes}-{signature}"
+        
+        # Берем текущее время (округляем до секунд) и переводим в hex
+        timestamp_hex = hex(int(time.time()))[2:]  # например: '665af380'
+        
+        # Объединяем полезную нагрузку, которую будем защищать подписью
+        payload = f"{rand_bytes}:{timestamp_hex}"
+        
+        # Подписываем весь payload целиком
+        signature = hmac.new(
+            self.secret_key, payload.encode(), hashlib.sha256
+        ).hexdigest()[:8]
+        
+        return f"{rand_bytes}-{timestamp_hex}-{signature}"
 
     def _is_valid_free_subdomain(self, subdomain: str) -> bool:
-        """Проверяет, был ли этот бесплатный поддомен сгенерирован нашим сервером."""
+        """Проверяет валидность поддомена и то, что он был создан менее 1 часа назад."""
         
-        if "-" not in subdomain:
+        # Проверяем структуру (теперь должно быть ровно два дефиса)
+        if subdomain.count("-") != 2:
             return False
 
-        rand_bytes, signature = subdomain.split("-", 1)
-        expected_signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
+        rand_bytes, timestamp_hex, signature = subdomain.split("-", 2)
         
-        # hmac.compare_digest защищает от атак по времени (timing attacks)
-        return hmac.compare_digest(signature, expected_signature)
+        # 1. Сначала проверяем криптографическую подпись
+        payload = f"{rand_bytes}:{timestamp_hex}"
+        expected_signature = hmac.new(
+            self.secret_key, payload.encode(), hashlib.sha256
+        ).hexdigest()[:8]
+        
+        # Защита от timing-атак: если подпись левая — сразу выходим
+        if not hmac.compare_digest(signature, expected_signature):
+            return False
+
+        # 2. Подпись верна, теперь проверяем время жизни (Time-to-Live)
+        try:
+            # Переводим hex-таймстамп обратно в int (секунды)
+            created_time = int(timestamp_hex, 16)
+        except ValueError:
+            return False  # На случай, если в hex_timestamp передали невалидные символы
+
+        current_time = int(time.time())
+
+        if current_time - created_time > TUNNEL_LIVE_TIME_SECONDS:
+            print(f"⏱️ Поддомен {subdomain} просрочен (создан более {TUNNEL_LIVE_TIME_SECONDS} часов назад)")
+            return False
+
+        return True
 
 
 if __name__ == "__main__":

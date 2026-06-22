@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SECRET_KEY = os.environ['SECRET_KEY']
+TUNNEL_LIVE_TIME_SECONDS = float(os.environ['TUNNEL_LIVE_TIME_HOURS']) * 3600
 
 DB_USER = os.environ['POSTGRES_USER']
 DB_PASSWORD = os.environ['POSTGRES_PASSWORD']
