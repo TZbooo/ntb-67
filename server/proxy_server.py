@@ -103,8 +103,8 @@ class NTBServer:
                 await writer.drain()
 
                 while True:
-                    # Ждем keep-alive от клиента или новые команды. Таймаут 60 сек.
-                    data = await asyncio.wait_for(reader.read(1024), timeout=60.0)
+                    # Ждем keep-alive от клиента или новые команды. Таймаут 10 мин.
+                    data = await asyncio.wait_for(reader.read(1024), timeout=10 * 60.0)
                     
                     if data == b"":
                         # Клиент корректно закрыл сокет с той стороны
