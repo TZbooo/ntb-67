@@ -14,19 +14,14 @@
 и маршрутизирует трафик от Nginx к соответствующим туннелям.
 """
 
-import os
 import hmac
 import hashlib
 import secrets
 import asyncio
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
-
 from common.utils import close_writer, pipe
-
-
-load_dotenv()
+from .config import SECRET_KEY
 
 
 @dataclass
@@ -43,7 +38,7 @@ class NTBServer:
     def __init__(self):
         """Инициализирует NTBServer с реестром активных поддоменов."""
         
-        self.secret_key = os.environ['SECRET_KEY'].encode()
+        self.secret_key = SECRET_KEY.encode()  # Ключ для генерации и проверки поддоменов
         self.active_tunnels: dict[str, TunnelSession] = {}
 
     async def start(self) -> None:
@@ -70,6 +65,8 @@ class NTBServer:
     ) -> None:
         """Обрабатывает служебные подключения от туннель-клиента."""
         
+        subdomain = None
+        line = ""
         try:
             # Читаем приветственное сообщение от клиента (например, "INIT\n")
             line_bytes = await reader.readline()
@@ -79,8 +76,6 @@ class NTBServer:
 
             # Если клиент запрашивает инициализацию нового туннеля
             if line == "INIT" or line.startswith("INIT:"):
-                subdomain = None
-
                 if line.startswith("INIT:"):
                     requested_subdomain = line.split(":", 1)[1].strip()
                     if self._is_valid_free_subdomain(requested_subdomain):
@@ -96,9 +91,7 @@ class NTBServer:
                     else:
                         print(f"⚠️ Клиент пытается захватить домен (хакер): {requested_subdomain}")
                 if not subdomain:
-                    print('000000')
                     subdomain = self._generate_free_subdomain()  # Генерируем новый поддомен для клиента
-                    print(subdomain)
                     while subdomain in self.active_tunnels:
                         subdomain = self._generate_free_subdomain()
 
@@ -108,6 +101,15 @@ class NTBServer:
                 # Отправляем сгенерированный поддомен обратно клиенту
                 writer.write(f"ASSIGNED:{subdomain}\n".encode('utf-8'))
                 await writer.drain()
+
+                while True:
+                    # Ждем keep-alive от клиента или новые команды. Таймаут 60 сек.
+                    data = await asyncio.wait_for(reader.read(1024), timeout=60.0)
+                    
+                    if data == b"":
+                        # Клиент корректно закрыл сокет с той стороны
+                        print(f"🔌 Клиент {subdomain} корректно закрыл соединение.")
+                        break
 
             # Если клиент открыл сокет для передачи данных трафика
             elif line.startswith("DATA:"):
@@ -119,9 +121,21 @@ class NTBServer:
                     print(f"⚠️ Токен данных для неизвестного поддомена: {subdomain}")
                     await close_writer(writer)
 
+        except (asyncio.TimeoutError, ConnectionResetError):
+            print(f"⏱️ Управляющее соединение туннеля {subdomain} отвалилось по таймауту/обрыву.")
         except Exception as e:
-            print(f"❌ Ошибка при обработке клиента: {e}")
-            await close_writer(writer)
+            print(f"❌ Ошибка при обработке клиента ({subdomain}): {e}")
+        finally:
+            # Сюда управление попадет ТОЛЬКО в двух случаях:
+            # 1. Произошло исключение (внутри INIT или DATA)
+            # 2. Произошел break из бесконечного цикла удержания туннеля (Ветка Б)
+            # Если это был успешный DATA-сокет, мы вышли через return выше, и этот блок не затронет его.
+            if subdomain and line.startswith("INIT"):
+                print(self.active_tunnels)
+                print(f"🧹 Очистка ресурсов для поддомена: {subdomain}")
+                if subdomain in self.active_tunnels:
+                    del self.active_tunnels[subdomain]
+                await close_writer(writer)
 
     async def handle_web_request(
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
@@ -137,7 +151,6 @@ class NTBServer:
 
         # Ищем заголовок Host в байтиках
         subdomain = self._extract_subdomain(header_chunk)
-        print(subdomain)
 
         if not subdomain or subdomain not in self.active_tunnels:
             print(f"🚫 Запрос на неизвестный или оффлайн поддомен: {subdomain}.24tunl.ru")
@@ -233,7 +246,6 @@ class NTBServer:
             return False
 
         rand_bytes, signature = subdomain.split("-", 1)
-        print([rand_bytes, signature])
         expected_signature = hmac.new(self.secret_key, rand_bytes.encode(), hashlib.sha256).hexdigest()[:8]
         
         # hmac.compare_digest защищает от атак по времени (timing attacks)
