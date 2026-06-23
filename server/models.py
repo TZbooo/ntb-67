@@ -19,6 +19,20 @@ import asyncio
 from dataclasses import dataclass
 
 
+@dataclass(frozen=True)
+class TunnelInfoDTO:
+    """
+    Немутируемый объект переноса данных (DTO) с метаданными туннеля.
+
+    Безопасно отдается во внешние слои приложения (например, в REST API),
+    не раскрывая внутренние ссылки на сетевые сокеты и очереди.
+    """
+
+    subdomain: str
+    client_ip: str | None
+    queue_size: int
+
+
 @dataclass
 class TunnelSession:
     """Представляет активную сессию туннеля клиента."""
@@ -52,6 +66,46 @@ class TunnelRegistry:
 
         """
         return self._tunnels[subdomain]
+
+    def get_all_info(self) -> list[TunnelInfoDTO]:
+        """
+        Возвращает изолированный список с метаданными всех активных соединений.
+
+        Метод извлекает текущий размер асинхронной очереди данных и IP-адрес
+        управляющего соединения (Control Plane), предотвращая утечку ссылок
+        на живые объекты StreamWriter/Reader.
+
+        Returns
+        -------
+            Список замороженных объектов TunnelInfoDTO, безопасных для чтения.
+
+        """
+        snapshots: list[TunnelInfoDTO] = []
+        for subdomain, session in self._tunnels.items():
+            client_ip = None
+
+            # Извлекаем IP-адрес клиента из StreamWriter служебного канала
+            if session.control and not session.control.is_closing():
+                try:
+                    peername = session.control.get_extra_info("peername")
+                    if peername:
+                        # peername для IPv4/IPv6 — это кортеж, где первый элемент — IP
+                        client_ip = str(peername[0])
+                except (RuntimeError, ValueError):
+                    # На случай, если сокет успел закрыться в момент итерации
+                    client_ip = None
+
+            # Безопасно считываем текущий размер очереди без мутации данных
+            queue_size = session.data_queue.qsize()
+
+            snapshots.append(
+                TunnelInfoDTO(
+                    subdomain=subdomain,
+                    client_ip=client_ip,
+                    queue_size=queue_size,
+                )
+            )
+        return snapshots
 
     def register(self, subdomain: str) -> TunnelSession:
         """

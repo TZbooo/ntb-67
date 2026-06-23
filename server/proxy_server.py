@@ -31,32 +31,6 @@ class NTBServer:
         """Инициализирует NTBServer с реестром активных поддоменов."""
         self.active_tunnels = TunnelRegistry()
 
-    async def start(self) -> None:
-        """
-        Запускает сокеты управляющего слоя и публичного веб-сервера.
-
-        Разворачивает два независимых экземпляра asyncio.Server: один на порту
-        9000 для обслуживания служебных и дата-подключений от CLI-клиентов,
-        второй на порту 8000 для приема входящего HTTP-трафика от Nginx.
-        """
-        # Порт 9000 — для подключений самих NTBClient
-        control_server = await asyncio.start_server(
-            self.handle_client_connection, "0.0.0.0", 9000
-        )
-        # Порт 8000 — принимает чистый HTTP-трафик, перенаправленный из Nginx
-        web_server = await asyncio.start_server(
-            self.handle_web_request, "0.0.0.0", 8000
-        )
-
-        print("🚀 NTB Server успешно запущен!")
-        print("🤖 Порт для клиентов (Control/Data): 9000")
-        print("🌐 Порт для веб-трафика (от Nginx): 8000")
-
-        async with control_server, web_server:
-            await asyncio.gather(
-                control_server.serve_forever(), web_server.serve_forever()
-            )
-
     async def handle_client_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
@@ -270,7 +244,3 @@ class NTBServer:
         await asyncio.gather(
             pipe(web_reader, data_writer), pipe(data_reader, web_writer)
         )
-
-
-if __name__ == "__main__":
-    asyncio.run(NTBServer().start())
