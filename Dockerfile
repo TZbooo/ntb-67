@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Запускаем скрипт как модуль (флаг -u отключает буферизацию логов, чтобы print() сразу шли в консоль)
-CMD ["python", "-u", "-m", "server.proxy_server"]
+CMD ["python", "-u", "-m", "server.main"]
