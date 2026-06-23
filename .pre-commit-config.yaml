@@ -2,7 +2,7 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0  # Используйте актуальную версию
     hooks:
-      - id: check-byte-order-marker
+      - id: fix-byte-order-marker
       - id: mixed-line-ending
       - id: trailing-whitespace  # Удаляет лишние пробелы на концах строк
       - id: end-of-file-fixer    # Гарантирует пустую строку в конце файла
