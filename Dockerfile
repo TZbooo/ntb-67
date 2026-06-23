@@ -4,6 +4,8 @@ FROM python:3.14-slim
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Копируем файл зависимостей
 COPY requirements.txt .
 
