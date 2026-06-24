@@ -52,7 +52,7 @@ async def main() -> None:
 
     # 3. Конфигурируем и запускаем FastAPI API для админки
     config = uvicorn.Config(
-        app="main:app",
+        app="server.main:app",
         host="0.0.0.0",
         port=8080,
         loop="asyncio",
