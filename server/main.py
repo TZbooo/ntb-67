@@ -51,7 +51,13 @@ async def main() -> None:
     print("🌐 TCP Web Traffic Server запущен на порту 8000")
 
     # 3. Конфигурируем и запускаем FastAPI API для админки
-    config = uvicorn.Config(app=app, host="0.0.0.0", port=8080, loop="asyncio")
+    config = uvicorn.Config(
+        app="main:app",
+        host="0.0.0.0",
+        port=8080,
+        loop="asyncio",
+        log_level="info",
+    )
     uvicorn_server = uvicorn.Server(config)
 
     # Управляем жизненным циклом сокет-серверов и веб-админки
