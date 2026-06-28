@@ -64,7 +64,6 @@ async def start(message: Message) -> None:
 @app.post("/bot/webhook")
 async def telegram_webhook(request: Request) -> dict[str, str]:
     """Эндпоинт, куда Telegram будет присылать обновления."""
-    print(999999)
     print(await request.json())
     update = Update.model_validate(
         await request.json(), context={"bot": tg_bot}
