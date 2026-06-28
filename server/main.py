@@ -21,16 +21,55 @@
 
 import asyncio
 import sys
+from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from aiogram import Bot, Dispatcher
+from fastapi import FastAPI, HTTPException, Request, status
 
 from server.api.dependencies import APIContext
 from server.api.routes import router
+from server.config import project_settings
 from server.proxy_server import NTBServer
+from server.tg_bot.handlers import tg_bot_router
+
+tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
+dp = Dispatcher()
+dp.include_router(tg_bot_router)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
+    # При старте сервера регистрируем webhook в Telegram
+    await tg_bot.set_webhook(
+        url=project_settings.WEBHOOK_URL,
+        secret_token=project_settings.WEBHOOK_SECRET,
+    )
+    yield
+    # При остановке сервера удаляем webhook
+    await tg_bot.delete_webhook()
+    await tg_bot.session.close()
+
 
 app = FastAPI(title="NTB-67 Admin Core API")
 app.include_router(router)
+
+
+@app.post("/bot/webhook", include_in_schema=False)
+async def telegram_webhook(request: Request):
+    """Эндпоинт, куда Telegram будет присылать обновления."""
+    # Проверяем секретный токен, чтобы никто левый не спамил в эндпоинт
+    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    if secret_token != project_settings.WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid secret token"
+        )
+
+    # Передаем апдейт в aiogram
+    update = await request.json()
+    await dp.feed_webhook_update(tg_bot, update)
+    return {"status": "ok"}
 
 
 async def main() -> None:

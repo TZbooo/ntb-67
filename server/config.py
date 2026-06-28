@@ -21,6 +21,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ProjectSettings(BaseSettings):
     """Конфигурация проекта ntb-67, загружаемая из переменных окружения."""
 
+    TG_BOT_TOKEN: str
+
+    WEBHOOK_URL: str
+    WEBHOOK_SECRET: str
+
     SECRET_KEY: str
     TUNNEL_LIVE_TIME_HOURS: float
 
