@@ -31,6 +31,7 @@ from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
 from server.proxy_server import NTBServer
+from server.tg_bot.handlers import tg_bot_router
 
 tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
 dp = Dispatcher()
@@ -39,6 +40,7 @@ dp = Dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
+    dp.include_router(tg_bot_router)
     # При старте сервера регистрируем webhook в Telegram
     await tg_bot.set_webhook(
         url=project_settings.WEBHOOK_URL,
@@ -50,7 +52,7 @@ async def lifespan(app: FastAPI):
     await tg_bot.session.close()
 
 
-app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
+app = FastAPI(title="NTB-67 Admin Core API")
 app.include_router(router)
 
 
