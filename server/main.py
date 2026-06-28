@@ -25,14 +25,14 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
-from aiogram.types import Message, Update
+from aiogram.types import Update
 from fastapi import FastAPI, Request
 
 from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
 from server.proxy_server import NTBServer
+from server.tg_bot import tg_bot_router
 
 tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
 dp = Dispatcher()
@@ -41,7 +41,7 @@ dp = Dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
-    print(f"{project_settings.WEBHOOK_URL=}")
+    dp.include_router(tg_bot_router)
     await tg_bot.set_webhook(
         url=project_settings.WEBHOOK_URL,
         allowed_updates=dp.resolve_used_update_types(),
@@ -55,16 +55,9 @@ app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
 
 
-@dp.message(CommandStart())
-async def start(message: Message) -> None:
-    """Обработчик команды /start для Telegram-бота."""
-    await message.answer("Привет!")
-
-
 @app.post("/bot/webhook")
 async def telegram_webhook(request: Request) -> dict[str, str]:
     """Эндпоинт, куда Telegram будет присылать обновления."""
-    print(await request.json())
     update = Update.model_validate(
         await request.json(), context={"bot": tg_bot}
     )
@@ -77,19 +70,16 @@ async def main() -> None:
     ntb_server = NTBServer()
     APIContext.init(ntb_server)
 
-    # 1. Запускаем управляющий сокет для CLI-клиентов
     control_server = await asyncio.start_server(
         ntb_server.handle_client_connection, host="0.0.0.0", port=9000
     )
     print("🚀 TCP Control Server запущен на порту 9000")
 
-    # 2. Запускаем сокет для приема HTTP-трафика от Nginx
     web_server = await asyncio.start_server(
         ntb_server.handle_web_request, host="0.0.0.0", port=8000
     )
     print("🌐 TCP Web Traffic Server запущен на порту 8000")
 
-    # 3. Конфигурируем и запускаем FastAPI API для админки
     config = uvicorn.Config(
         app="server.main:app",
         host="0.0.0.0",
@@ -99,7 +89,6 @@ async def main() -> None:
     )
     uvicorn_server = uvicorn.Server(config)
 
-    # Управляем жизненным циклом сокет-серверов и веб-админки
     async with control_server, web_server:
         await asyncio.gather(
             control_server.serve_forever(),
