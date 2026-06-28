@@ -40,7 +40,6 @@ dp = Dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
-    dp.include_router(tg_bot_router)
     # При старте сервера регистрируем webhook в Telegram
     await tg_bot.set_webhook(
         url=project_settings.WEBHOOK_URL,
@@ -59,6 +58,8 @@ app.include_router(router)
 @app.post("/bot/webhook", include_in_schema=False)
 async def telegram_webhook(request: Request):
     """Эндпоинт, куда Telegram будет присылать обновления."""
+    print(999999)
+    print(request)
     # Проверяем секретный токен, чтобы никто левый не спамил в эндпоинт
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     if secret_token != project_settings.WEBHOOK_SECRET:
@@ -110,6 +111,7 @@ async def main() -> None:
 
 if __name__ == "__main__":
     try:
+        dp.include_router(tg_bot_router)
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n🛑 Сервер остановлен пользователем.")
