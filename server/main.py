@@ -31,7 +31,6 @@ from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
 from server.proxy_server import NTBServer
-from server.tg_bot.handlers import tg_bot_router
 
 tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
 dp = Dispatcher()
@@ -111,7 +110,6 @@ async def main() -> None:
 
 if __name__ == "__main__":
     try:
-        dp.include_router(tg_bot_router)
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n🛑 Сервер остановлен пользователем.")
