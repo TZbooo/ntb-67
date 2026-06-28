@@ -25,6 +25,8 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from aiogram import Bot, Dispatcher
+from aiogram.filters import CommandStart
+from aiogram.types import Message
 from fastapi import FastAPI, Request
 
 from server.api.dependencies import APIContext
@@ -39,13 +41,24 @@ dp = Dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
-    await tg_bot.set_webhook(url=project_settings.WEBHOOK_URL)
+    print(f"{project_settings.WEBHOOK_URL=}")
+    await tg_bot.set_webhook(
+        url=project_settings.WEBHOOK_URL,
+        allowed_updates=dp.resolve_used_update_types(),
+        drop_pending_updates=True,
+    )
     yield
     await tg_bot.delete_webhook()
 
 
-app = FastAPI(title="NTB-67 Admin Core API")
+app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
+
+
+@dp.message(CommandStart())
+async def start(message: Message) -> None:
+    """Обработчик команды /start для Telegram-бота."""
+    await message.answer("Привет!")
 
 
 @app.post("/bot/webhook")
