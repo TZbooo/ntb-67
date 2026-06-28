@@ -10,23 +10,42 @@
 """
 Конфигурация окружения и параметров базы данных проекта ntb-67.
 
-Загружает переменные среды из файлов окружения и предоставляет их в виде констант для использования
+Загружает переменные среды из файлов окружения и предоставляет их в виде
+типизированного объекта настроек Pydantic.
 """
 
-import os
+from pydantic import computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from dotenv import load_dotenv
 
-load_dotenv()
+class ProjectSettings(BaseSettings):
+    """Конфигурация проекта ntb-67, загружаемая из переменных окружения."""
 
-SECRET_KEY = os.environ["SECRET_KEY"]
-TUNNEL_LIVE_TIME_SECONDS = float(os.environ["TUNNEL_LIVE_TIME_HOURS"]) * 3600
+    SECRET_KEY: str
+    TUNNEL_LIVE_TIME_HOURS: float
 
-DB_USER = os.environ["POSTGRES_USER"]
-DB_PASSWORD = os.environ["POSTGRES_PASSWORD"]
-DB_NAME = os.environ["POSTGRES_DB"]
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    DB_HOST: str
+    DB_PORT: int
 
-DB_HOST = os.environ["DB_HOST"]
-DB_PORT = os.environ["DB_PORT"]
+    model_config = SettingsConfigDict(extra="ignore")
 
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    @computed_field
+    @property
+    def tunnel_live_time_seconds(self) -> float:
+        """Возвращает время жизни туннеля, переведенное из часов в секунды."""
+        return self.TUNNEL_LIVE_TIME_HOURS * 3600
+
+    @computed_field
+    @property
+    def database_url(self) -> str:
+        """Формирует строку подключения к PostgreSQL на основе параметров."""
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
+        )
+
+
+project_settings = ProjectSettings()  # type: ignore[call-arg]

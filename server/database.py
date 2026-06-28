@@ -23,9 +23,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from .config import DATABASE_URL
+from .config import project_settings
 
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine = create_async_engine(
+    project_settings.database_url, echo=False, future=True
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

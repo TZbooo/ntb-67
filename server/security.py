@@ -20,7 +20,7 @@ import hmac
 import secrets
 import time
 
-from .config import SECRET_KEY, TUNNEL_LIVE_TIME_SECONDS
+from .config import project_settings
 
 
 def generate_free_subdomain() -> str:
@@ -44,7 +44,7 @@ def generate_free_subdomain() -> str:
 
     # Подписываем весь payload целиком
     signature = hmac.new(
-        SECRET_KEY.encode(), payload.encode(), hashlib.sha256
+        project_settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256
     ).hexdigest()[:8]
 
     return f"{rand_bytes}-{timestamp_hex}-{signature}"
@@ -75,7 +75,7 @@ def is_valid_subdomain(subdomain: str) -> bool:
     # 1. Сначала проверяем криптографическую подпись
     payload = f"{rand_bytes}:{timestamp_hex}"
     expected_signature = hmac.new(
-        SECRET_KEY.encode(), payload.encode(), hashlib.sha256
+        project_settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256
     ).hexdigest()[:8]
 
     # Защита от timing-атак: если подпись левая — сразу выходим
@@ -93,9 +93,9 @@ def is_valid_subdomain(subdomain: str) -> bool:
 
     current_time = int(time.time())
 
-    if current_time - created_time > TUNNEL_LIVE_TIME_SECONDS:
+    if current_time - created_time > project_settings.tunnel_live_time_seconds:
         print(
-            f"⏱️ Поддомен {subdomain} просрочен (создан более {TUNNEL_LIVE_TIME_SECONDS} часов назад)"
+            f"⏱️ Поддомен {subdomain} просрочен (создан более {project_settings.tunnel_live_time_seconds} секунд назад)"
         )
         return False
 
