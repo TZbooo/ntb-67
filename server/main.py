@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram.types import Message, Update
 from fastapi import FastAPI, Request
 
 from server.api.dependencies import APIContext
@@ -65,8 +65,10 @@ async def start(message: Message) -> None:
 async def telegram_webhook(request: Request) -> dict[str, str]:
     """Эндпоинт, куда Telegram будет присылать обновления."""
     print(999999)
-    print(request)
-    update = await request.json()
+    print(request.json())
+    update = Update.model_validate(
+        await request.json(), context={"bot": tg_bot}
+    )
     await dp.feed_update(tg_bot, update)
     return {"status": "ok"}
 
