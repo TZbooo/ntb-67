@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     await tg_bot.session.close()
 
 
-app = FastAPI(title="NTB-67 Admin Core API")
+app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
 
 
