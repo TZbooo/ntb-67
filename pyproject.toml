@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ntb-67-client"
-version = "0.1.2"
+version = "0.1.4"
 description = "Asyncio Tunneling Proxy Client — alternative for ngrok/localtunnel"
 readme = "README.md"
 authors = [
