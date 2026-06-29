@@ -9,21 +9,39 @@
 
 """Определения CRUD-операций для работы с данными пользователя."""
 
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import TelegramUser
 
 
-async def get_telegram_user(
-    session: AsyncSession, tg_id: int
+async def get_telegram_user_by(
+    session: AsyncSession, **kwargs: Any
 ) -> TelegramUser | None:
     """
-    Проверяет наличие пользователя в базе данных по его Telegram ID.
+    Универсальный метод поиска пользователя по любому переданному полю.
 
-    Возвращает объект TelegramUser, если пользователь найден, иначе None.
+    Примеры использования:
+    --------------------
+    user = await get_user_by(session, tg_id=123456)
+    user = await get_user_by(session, api_key="ntb_...")
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Активная асинхронная сессия SQLAlchemy.
+    **kwargs : Any
+        Параметры фильтрации (например, tg_id=..., api_key=...).
+
+    Returns
+    -------
+    TelegramUser | None
+        Объект пользователя, если найден, иначе None.
+
     """
-    query = select(TelegramUser).where(TelegramUser.tg_id == tg_id)
+    query = select(TelegramUser).filter_by(**kwargs)
     result = await session.execute(query)
     return result.scalar_one_or_none()
 

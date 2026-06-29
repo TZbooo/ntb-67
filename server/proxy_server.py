@@ -19,9 +19,11 @@ import asyncio
 
 from common.utils import close_writer, pipe
 
+from .database import get_db_session
 from .http_utils import extract_subdomain
 from .models import TunnelRegistry
 from .security import generate_free_subdomain, is_valid_subdomain
+from .tg_bot.crud import get_telegram_user_by
 
 
 class NTBServer:
@@ -260,4 +262,7 @@ class NTBServer:
         )
 
     async def _authenticate_user(self, api_key: str) -> bool:
-        return True
+        """Проверяет существование API-ключе в базе данных PostgreSQL."""
+        async with get_db_session() as session:
+            user = await get_telegram_user_by(session, api_key=api_key)
+            return user is not None

@@ -20,7 +20,7 @@ from aiogram.types import (
 
 from server.database import get_db_session
 
-from .crud import create_telegram_user, get_telegram_user
+from .crud import create_telegram_user, get_telegram_user_by
 
 tg_bot_router = Router()
 
@@ -58,7 +58,7 @@ async def start(message: Message) -> None:
         return
 
     async with get_db_session() as session:
-        user = await get_telegram_user(session, message.from_user.id)
+        user = await get_telegram_user_by(session, tg_id=message.from_user.id)
         if not user:
             user = await create_telegram_user(session, message.from_user.id)
 
@@ -97,7 +97,7 @@ async def callback_view_api_key(callback: CallbackQuery) -> None:
         return
 
     async with get_db_session() as session:
-        user = await get_telegram_user(session, callback.from_user.id)
+        user = await get_telegram_user_by(session, tg_id=callback.from_user.id)
 
     if not user:
         await callback.answer("Пользователь не найден.", show_alert=True)

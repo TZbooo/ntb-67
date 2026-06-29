@@ -25,7 +25,7 @@ class NTBClient:
     """Клиент туннелирования с поддержкой динамических поддоменов."""
 
     def __init__(
-        self, server_host: str, server_port: int, local_port: int
+        self, server_host: str, server_port: int, local_port: int, api_key: str
     ) -> None:
         """
         Инициализирует экземпляр NTBClient.
@@ -35,11 +35,13 @@ class NTBClient:
             server_host: IP-адрес или домен удаленного сервера маршрутизации.
             server_port: Управляющий TCP-порт удаленного сервера.
             local_port: Сетевой порт локального веб-сервера для проброса.
+            api_key: API ключ клиента
 
         """
         self.server_host = server_host
         self.server_port = server_port
         self.local_port = local_port
+        self.api_key = api_key
         self.subdomain = None
 
     async def open_connection(
@@ -90,11 +92,13 @@ class NTBClient:
 
         if self.subdomain:
             # Отправляем запрос на инициализацию с указанием поддомена
-            writer.write(f"INIT:1234:{self.subdomain}\n".encode("utf-8"))
+            writer.write(
+                f"INIT:{self.api_key}:{self.subdomain}\n".encode("utf-8")
+            )
             await writer.drain()
         else:
             # Отправляем запрос на инициализацию без указания поддомена
-            writer.write(b"INIT:1234\n")
+            writer.write(f"INIT:{self.api_key}\n".encode("utf-8"))
             await writer.drain()
 
         # Ждем ответ от сервера с назначенным UUID/хэшем
@@ -197,20 +201,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="ntb-67 — Скоростной асинхронный туннель для локальных портов."
     )
-    # Позиционный аргумент: порт локального веб-сервера
     parser.add_argument(
         "local_port",
         type=int,
         help="Локальный порт, который необходимо пробросить наружу (например, 8000)",
     )
-    # Опциональный аргумент для смены хоста сервера туннелей
+    parser.add_argument(
+        "api_key",
+        type=str,
+        help="Ключ API клиента из Telegram-бота",
+    )
     parser.add_argument(
         "--host",
         type=str,
         default="24tunl.ru",
         help="Хост удаленного сервера NTB (дефолт: 24tunl.ru)",
     )
-    # Опциональный аргумент для порта сервера туннелей
     parser.add_argument(
         "--port",
         type=int,
@@ -225,6 +231,7 @@ def main() -> None:
             server_host=args.host,
             server_port=args.port,
             local_port=args.local_port,
+            api_key=args.api_key,
         )
         asyncio.run(client.start())
     except KeyboardInterrupt:
