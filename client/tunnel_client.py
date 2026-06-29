@@ -90,11 +90,11 @@ class NTBClient:
 
         if self.subdomain:
             # Отправляем запрос на инициализацию с указанием поддомена
-            writer.write(f"INIT:{self.subdomain}\n".encode("utf-8"))
+            writer.write(f"INIT:1234:{self.subdomain}\n".encode("utf-8"))
             await writer.drain()
         else:
             # Отправляем запрос на инициализацию без указания поддомена
-            writer.write(b"INIT\n")
+            writer.write(b"INIT:1234\n")
             await writer.drain()
 
         # Ждем ответ от сервера с назначенным UUID/хэшем

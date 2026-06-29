@@ -58,9 +58,23 @@ class NTBServer:
             line = line_bytes.decode("utf-8").strip()
 
             # Если клиент запрашивает инициализацию нового туннеля
-            if line == "INIT" or line.startswith("INIT:"):
-                if line.startswith("INIT:"):
-                    requested_subdomain = line.split(":", 1)[1].strip()
+            if line.startswith("INIT:"):
+                parts = line.split(":")
+                api_key = parts[1].strip()
+                requested_subdomain = (
+                    parts[2].strip() if len(parts) > 2 else None
+                )
+
+                if not await self._authenticate_user(api_key):
+                    print(
+                        f"🚫 Отклонено: попытка подключения с невалидным API-ключом: {api_key[:10]}..."
+                    )
+                    writer.write(b"ERROR:Invalid API Key\n")
+                    await writer.drain()
+                    await close_writer(writer)
+                    return
+
+                if requested_subdomain:
                     if is_valid_subdomain(requested_subdomain):
                         if self.active_tunnels.contains(requested_subdomain):
                             subdomain = requested_subdomain
@@ -244,3 +258,6 @@ class NTBServer:
         await asyncio.gather(
             pipe(web_reader, data_writer), pipe(data_reader, web_writer)
         )
+
+    async def _authenticate_user(self, api_key: str) -> bool:
+        return True
