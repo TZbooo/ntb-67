@@ -26,3 +26,35 @@ async def get_telegram_user(
     query = select(TelegramUser).where(TelegramUser.tg_id == tg_id)
     result = await session.execute(query)
     return result.scalar_one_or_none()
+
+
+async def create_telegram_user(
+    session: AsyncSession, tg_id: int
+) -> TelegramUser:
+    """
+    Создает новую запись пользователя Telegram с автоматически сгенерированным API-ключом.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Активная асинхронная сессия SQLAlchemy.
+    tg_id : int
+        Уникальный Telegram ID пользователя.
+
+    Returns
+    -------
+    TelegramUser
+        Объект созданного пользователя, включая сгенерированный API-ключ.
+
+    Raises
+    ------
+    Exception
+        Если при фиксации транзакции в базе данных возникла ошибка.
+
+    """
+    db_user = TelegramUser(tg_id=tg_id)
+    session.add(db_user)
+    await (
+        session.flush()
+    )  # Заставляет SQLAlchemy сгенерировать default-значения и ID
+    return db_user

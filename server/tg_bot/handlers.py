@@ -15,7 +15,7 @@ from aiogram.types import Message
 
 from server.database import get_db_session
 
-from .crud import get_telegram_user
+from .crud import create_telegram_user, get_telegram_user
 
 tg_bot_router = Router()
 
@@ -23,6 +23,13 @@ tg_bot_router = Router()
 @tg_bot_router.message(CommandStart())
 async def start(message: Message) -> None:
     """Обработчик команды /start для Telegram-бота."""
+    if message.from_user is None:
+        print("Ошибка: message.from_user is None")
+        await message.answer(
+            "Ошибка: не удалось определить пользователя. Обратитесь в поддержку."
+        )
+        return
+
     print(
         f"Получено сообщение /start от пользователя {message.from_user.id} ({message.from_user.username})"
     )
@@ -32,4 +39,9 @@ async def start(message: Message) -> None:
         if user:
             print(f"Пользователь найден: {user.api_key}")
         else:
-            print("Пользователь не зарегистрирован")
+            user = await create_telegram_user(session, message.from_user.id)
+            print(f"Пользователь создан: {user.api_key}")
+
+        await message.answer(
+            f"Привет, {message.from_user.first_name}! Ваш API-ключ: {user.api_key}"
+        )
