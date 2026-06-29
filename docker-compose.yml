@@ -24,6 +24,8 @@ services:
       - ntb-network
     restart: always
     env_file: .env
+    volumes:
+      - ./migrations/versions:/app/migrations/versions
 
   nginx:
     image: nginx:latest
