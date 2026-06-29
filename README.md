@@ -1,4 +1,4 @@
-# ntb-67 --- Asyncio Tunneling Proxy Client
+# ntb-67 — Asyncio Tunneling Proxy Client
 
 [![PyPI
 version](https://img.shields.io/pypi/v/ntb-67-client.svg)](https://pypi.org/project/ntb-67-client/)
@@ -8,7 +8,7 @@ Support](https://img.shields.io/badge/Telegram-Support-blue.svg?logo=telegram)](
 
 ------------------------------------------------------------------------
 
-ntb-67-client --- это легковесный асинхронный CLI-клиент на базе Python
+ntb-67-client — это легковесный асинхронный CLI-клиент на базе Python
 asyncio, предназначенный для быстрого проброса локальных портов в
 глобальную сеть. Альтернатива таким инструментам, как ngrok и
 localtunnel.
