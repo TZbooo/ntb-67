@@ -8,3 +8,33 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """Файл определения локальных, для модуля логики телеграм-интерфейса, моделей данных."""
+
+import secrets
+
+from sqlalchemy import BigInteger, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from server.database import Base
+
+
+def generate_api_key() -> str:
+    """Генерирует криптографически безопасный случайный токен для API."""
+    return f"ntb_{secrets.token_urlsafe(32)}"
+
+
+class TelegramUser(Base):
+    """Модель пользователя, зарегистрированного через Telegram-бота."""
+
+    __tablename__ = "telegram_users"
+
+    tg_id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, unique=True, nullable=False
+    )
+
+    api_key: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, default=generate_api_key
+    )
+
+    def __repr__(self) -> str:
+        """Возвращает строковое представление объекта TelegramUser для отладки и логов."""
+        return f"<TelegramUser tg_id={self.tg_id}>"

@@ -13,10 +13,23 @@ from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
+from server.database import get_db_session
+
+from .crud import get_telegram_user
+
 tg_bot_router = Router()
 
 
 @tg_bot_router.message(CommandStart())
 async def start(message: Message) -> None:
     """Обработчик команды /start для Telegram-бота."""
-    await message.answer("Привет!")
+    print(
+        f"Получено сообщение /start от пользователя {message.from_user.id} ({message.from_user.username})"
+    )
+    async with get_db_session() as session:
+        user = await get_telegram_user(session, message.from_user.id)
+
+        if user:
+            print(f"Пользователь найден: {user.api_key}")
+        else:
+            print("Пользователь не зарегистрирован")
