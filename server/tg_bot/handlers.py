@@ -127,7 +127,7 @@ async def callback_view_api_key(callback: CallbackQuery) -> None:
 
 @tg_bot_router.callback_query(F.data == "view_tunnels")
 async def callback_view_tunnels(callback: CallbackQuery) -> None:
-    """Заглушка для будущего функционала управления активными туннелями."""
+    """Отображает информацию о доступных лимитах туннелей пользователя."""
     if not isinstance(callback.message, Message):
         await callback.answer(
             "❌ Ошибка: сообщение недоступно для редактирования.",
@@ -135,10 +135,20 @@ async def callback_view_tunnels(callback: CallbackQuery) -> None:
         )
         return
 
+    async with get_db_session() as session:
+        user = await get_telegram_user_by(session, tg_id=callback.from_user.id)
+
+    if not user:
+        await callback.answer("Пользователь не найден.", show_alert=True)
+        return
+
     text = (
         "🌐 *Управление туннелями ntb-67*\n\n"
-        "В текущей версии MVP вывод активных прокси находится в разработке.\n\n"
-        "📡 _Скоро здесь появится статистика трафика, пинг и управление портами._"
+        f"📊 Твой текущий лимит: *{user.max_tunnels}* активных туннелей.\n\n"
+        "ℹ️ В текущей версии MVP вывод списка активных прокси находится в разработке. "
+        "Скоро здесь появится статистика трафика, пинг и возможность закрывать сессии.\n\n"
+        "⭐️ *PRO-тариф (Скоро):* Мы уже готовим платные подписки, на которых "
+        "можно будет расширить лимит и запускать больше одного туннеля одновременно!"
     )
 
     keyboard = InlineKeyboardMarkup(
