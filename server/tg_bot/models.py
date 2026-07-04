@@ -11,8 +11,8 @@
 
 import secrets
 
-from sqlalchemy import BigInteger, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
 
@@ -37,8 +37,40 @@ class TelegramUser(Base):
 
     max_tunnels: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
+    subdomains: Mapped[list["UserSubdomain"]] = relationship(
+        "UserSubdomain", back_populates="user", cascade="all, delete-orphan"
+    )
+
     def __repr__(self) -> str:
         """Возвращает строковое представление объекта TelegramUser для отладки и логов."""
         return (
             f"<TelegramUser tg_id={self.tg_id} max_tunnels={self.max_tunnels}>"
         )
+
+
+class UserSubdomain(Base):
+    """Модель выделенного пользователю поддомена для маршрутизации."""
+
+    __tablename__ = "user_subdomains"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+
+    subdomain: Mapped[str] = mapped_column(
+        String(63), unique=True, nullable=False
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("telegram_users.tg_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    user: Mapped["TelegramUser"] = relationship(
+        "TelegramUser", back_populates="subdomains"
+    )
+
+    def __repr__(self) -> str:
+        """Возвращает строковое представление объекта UserSubdomain."""
+        return f"<UserSubdomain id={self.id} subdomain={self.subdomain} user_id={self.user_id}>"
