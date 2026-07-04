@@ -11,7 +11,7 @@
 
 import secrets
 
-from sqlalchemy import BigInteger, String
+from sqlalchemy import BigInteger, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from server.database import Base
@@ -35,6 +35,10 @@ class TelegramUser(Base):
         String(64), unique=True, nullable=False, default=generate_api_key
     )
 
+    max_tunnels: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
     def __repr__(self) -> str:
         """Возвращает строковое представление объекта TelegramUser для отладки и логов."""
-        return f"<TelegramUser tg_id={self.tg_id}>"
+        return (
+            f"<TelegramUser tg_id={self.tg_id} max_tunnels={self.max_tunnels}>"
+        )
