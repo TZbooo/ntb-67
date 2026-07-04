@@ -14,11 +14,20 @@
 выделения дата-каналов и проброс входящих пакетов на локальный порт разработчика.
 """
 
-import argparse
 import asyncio
-import sys
+import configparser
+import os
+
+import typer
+from platformdirs import user_config_dir
 
 from common.utils import close_writer, pipe
+
+app = typer.Typer(
+    help="ntb-67 — Скоростной асинхронный туннель для локальных портов."
+)
+CONFIG_DIR = user_config_dir("ntb-67")
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.ini")
 
 
 class NTBClient:
@@ -190,54 +199,68 @@ class NTBClient:
             pass
 
 
-def main() -> None:
-    """
-    Парсит аргументы командной строки и инициализирует работу CLI-клиента.
+def get_saved_api_key() -> str | None:
+    """Получает сохраненный API ключ из конфигурационного файла или переменной окружения."""
+    if key := os.environ.get("NTB_API_KEY"):
+        return key
+    if os.path.exists(CONFIG_FILE):
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+        return config.get("AUTH", "api_key", fallback=None)
+    return None
 
-    Настраивает спецификацию интерфейса командной строки, перехватывает сигналы
-    принудительного завершения процесса пользователем и корректно освобождает
-    ресурсы.
-    """
-    parser = argparse.ArgumentParser(
-        description="ntb-67 — Скоростной асинхронный туннель для локальных портов."
-    )
-    parser.add_argument(
-        "local_port",
-        type=int,
-        help="Локальный порт, который необходимо пробросить наружу (например, 8000)",
-    )
-    parser.add_argument(
-        "api_key",
-        type=str,
-        help="Ключ API клиента из Telegram-бота",
-    )
-    parser.add_argument(
-        "--host",
-        type=str,
-        default="24tunl.ru",
-        help="Хост удаленного сервера NTB (дефолт: 24tunl.ru)",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=9000,
-        help="Управляющий порт удаленного сервера NTB (дефолт: 9000)",
-    )
 
-    args = parser.parse_args()
+@app.command()
+def auth(
+    api_key: str = typer.Argument(
+        ..., help="Ключ API клиента из Telegram-бота"
+    ),
+):
+    """Сохранить API ключ для авторизации на сервере."""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    config = configparser.ConfigParser()
+    config["AUTH"] = {"api_key": api_key}
+
+    with open(CONFIG_FILE, "w") as f:
+        config.write(f)
+    os.chmod(CONFIG_FILE, 0o600)
+
+    typer.secho("✅ API ключ успешно сохранен!", fg=typer.colors.GREEN)
+
+
+@app.command()
+def start(
+    local_port: int = typer.Argument(
+        ..., help="Локальный порт для проброса (например, 8000)"
+    ),
+    host: str = typer.Option("24tunl.ru", help="Хост удаленного сервера NTB"),
+    port: int = typer.Option(
+        9000, help="Управляющий порт удаленного сервера NTB"
+    ),
+):
+    """Запустить туннелирование для локального порта."""
+    api_key = get_saved_api_key()
+    if not api_key:
+        typer.secho(
+            "❌ Ошибка: API ключ не найден!", fg=typer.colors.RED, err=True
+        )
+        typer.echo(
+            "Пожалуйста, сначала выполните команду: ntb-67 auth <ваш_ключ>"
+        )
+        raise typer.Exit(code=1)
 
     try:
         client = NTBClient(
-            server_host=args.host,
-            server_port=args.port,
-            local_port=args.local_port,
-            api_key=args.api_key,
+            server_host=host,
+            server_port=port,
+            local_port=local_port,
+            api_key=api_key,
         )
         asyncio.run(client.start())
     except KeyboardInterrupt:
-        print("\n👋 Туннель закрыт пользователем. До встречи!")
-        sys.exit(0)
+        typer.echo("\n👋 Туннель закрыт пользователем. До встречи!")
+        raise typer.Exit(code=0)
 
 
 if __name__ == "__main__":
-    main()
+    app()
