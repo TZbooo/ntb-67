@@ -53,13 +53,11 @@ class NTBServer:
         subdomain = None
         line = ""
         try:
-            # Читаем приветственное сообщение от клиента (например, "INIT\n")
             line_bytes = await reader.readline()
             if not line_bytes:
                 return
             line = line_bytes.decode("utf-8").strip()
 
-            # Если клиент запрашивает инициализацию нового туннеля
             if line.startswith("INIT:"):
                 parts = line.split(":")
                 api_key = parts[1].strip()

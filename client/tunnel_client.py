@@ -125,12 +125,18 @@ class NTBClient:
             print(f"🔗 Публичный адрес:  https://{self.subdomain}.24tunl.ru")
             print(f"🏠 Локальный порт:   http://127.0.0.1:{self.local_port}")
             print("=" * 50 + "\n")
+        elif response.startswith("ERROR:"):
+            error_msg = response.split(":", 1)[1].strip()
+            print(f"❌ Сервер вернул ошибку: {error_msg}")
+            await close_writer(writer)
+            await asyncio.sleep(5)
+            return
         else:
             print("❌ Сервер отказал в инициализации туннеля.")
             await close_writer(writer)
+            await asyncio.sleep(5)
             return
 
-        # Запускаем фоновую задачу для пинга
         heartbeat_task = asyncio.create_task(self.start_heartbeat(writer))
 
         try:
@@ -141,7 +147,6 @@ class NTBClient:
 
                 cmd = line_bytes.decode("utf-8").strip()
                 if cmd == "REQUEST_CONN":
-                    # Ссылаемся на правильное имя метода: spawn_data_connection
                     asyncio.create_task(self.spawn_data_connection())
         finally:
             heartbeat_task.cancel()
