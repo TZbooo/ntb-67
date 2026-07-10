@@ -17,6 +17,8 @@
 import asyncio
 import configparser
 import os
+import platform
+import subprocess
 
 import typer
 from platformdirs import user_config_dir
@@ -26,6 +28,9 @@ from common.utils import close_writer, pipe
 app = typer.Typer(
     help="ntb-67 — Скоростной асинхронный туннель для локальных портов."
 )
+config_app = typer.Typer(help="Управление конфигурацией клиента.")
+app.add_typer(config_app, name="config")
+
 CONFIG_DIR = user_config_dir("ntb-67")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.ini")
 
@@ -228,9 +233,26 @@ def auth(
 
     with open(CONFIG_FILE, "w") as f:
         config.write(f)
-    os.chmod(CONFIG_FILE, 0o600)
+
+    if platform.system() != "Windows":
+        os.chmod(CONFIG_FILE, 0o600)
 
     typer.secho("✅ API ключ успешно сохранен!", fg=typer.colors.GREEN)
+
+
+@config_app.command(name="edit")
+def config_edit():
+    """Открыть файл конфигурации в текстовом редакторе."""
+    if not os.path.exists(CONFIG_FILE):
+        typer.secho("❌ Файл конфигурации не найден.", fg=typer.colors.RED)
+        return
+
+    typer.echo(f"📂 Открываю конфигурацию: {CONFIG_FILE}")
+
+    if platform.system() == "Windows":
+        subprocess.run(f'start "" "{CONFIG_FILE}"', shell=True)
+    else:
+        typer.launch(CONFIG_FILE)
 
 
 @app.command()
