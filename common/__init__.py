@@ -8,10 +8,10 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Общие утилиты и вспомогательные функции для проекта ntb-67.
+Shared utilities and helper functions for the NTB-67 project.
 
-Данный пакет содержит разделяемую логику между клиентом и сервером, включая
-инструменты для двустороннего проксирования трафика и безопасного закрытия сокетов.
+This package contains logic shared between the client and server, including
+helpers for bidirectional traffic proxying and safe socket closure.
 """
 
 from common.utils import close_writer, pipe

@@ -8,15 +8,15 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Модуль инициализации и запуска прокси-сервера NTB-67.
+Initialization and startup module for the NTB-67 proxy server.
 
-Объединяет управление TCP-сокетами и административным REST API
-в едином асинхронном событийно-ориентированном цикле (Event Loop).
+It combines TCP socket management and the administrative REST API in a single
+asynchronous event-driven loop.
 
-Архитектура портов:
-    * :9000 — TCP Control Server (управляющий сокет для CLI-клиентов).
-    * :8000 — TCP Web Traffic Server (прием входящего HTTP-трафика от Nginx).
-    * :8080 — FastAPI Admin API (веб-интерфейс управления, доступен локально).
+Port layout:
+    * :9000 — TCP control server (control socket for CLI clients)
+    * :8000 — TCP web traffic server (receives incoming HTTP traffic from Nginx)
+    * :8080 — FastAPI admin API (locally available management interface)
 """
 
 import asyncio
@@ -40,7 +40,7 @@ dp = Dispatcher()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Управление жизненным циклом FastAPI (включает/выключает Webhook)."""
+    """Manage the FastAPI lifecycle by enabling and disabling the webhook."""
     dp.include_router(tg_bot_router)
     await tg_bot.set_webhook(
         url=project_settings.WEBHOOK_URL,
@@ -57,7 +57,7 @@ app.include_router(router)
 
 @app.post("/bot/webhook")
 async def telegram_webhook(request: Request) -> dict[str, str]:
-    """Эндпоинт, куда Telegram будет присылать обновления."""
+    """Endpoint that receives updates from Telegram."""
     update = Update.model_validate(
         await request.json(), context={"bot": tg_bot}
     )
@@ -66,19 +66,19 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
 
 
 async def main() -> None:
-    """Точка входа: запускает сокет-серверы и API в одном Event Loop."""
+    """Entry point that starts the socket servers and API in one event loop."""
     ntb_server = NTBServer()
     APIContext.init(ntb_server)
 
     control_server = await asyncio.start_server(
         ntb_server.handle_client_connection, host="0.0.0.0", port=9000
     )
-    print("🚀 TCP Control Server запущен на порту 9000")
+    print("🚀 TCP control server started on port 9000")
 
     web_server = await asyncio.start_server(
         ntb_server.handle_web_request, host="0.0.0.0", port=8000
     )
-    print("🌐 TCP Web Traffic Server запущен на порту 8000")
+    print("🌐 TCP web traffic server started on port 8000")
 
     config = uvicorn.Config(
         app="server.main:app",
@@ -101,5 +101,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n🛑 Сервер остановлен пользователем.")
+        print("\n🛑 Server stopped by the user.")
         sys.exit(0)

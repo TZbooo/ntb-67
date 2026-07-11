@@ -8,11 +8,11 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Серверная часть асинхронного сервиса туннелирования ntb-67.
+Server-side package for the asynchronous ntb-67 tunneling service.
 
-Данный пакет отвечает за логику маршрутизации внешнего трафика (Control и Data Plane),
-управление активными сессиями поддоменов, мультиплексирование сокетов и координацию
-подключенных CLI-клиентов.
+This package handles external traffic routing (Control and Data Plane),
+management of active subdomain sessions, socket multiplexing, and coordination
+of connected CLI clients.
 """
 
 from server.proxy_server import NTBServer

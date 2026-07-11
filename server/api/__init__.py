@@ -7,4 +7,4 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Инициализация пакета API управления для ядра NTB-67."""
+"""Initialization of the management API package for the NTB-67 core."""

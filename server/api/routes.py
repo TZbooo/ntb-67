@@ -7,7 +7,7 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Маршруты REST API управления сессиями активных туннелей."""
+"""REST API routes for managing active tunnel sessions."""
 
 from typing import Any
 
@@ -26,11 +26,11 @@ router = APIRouter(
 @router.get("/tunnels")
 async def list_active_tunnels() -> dict[str, Any]:
     """
-    Возвращает структуру данных со списком всех активных туннелей в RAM.
+    Return a structure containing all active tunnels in memory.
 
     Returns
     -------
-        Словарь со статусом выполнения и списком активных поддоменов.
+        A dictionary with the operation status and the list of active subdomains.
 
     """
     server = APIContext.get_server()
@@ -42,23 +42,19 @@ async def list_active_tunnels() -> dict[str, Any]:
 @router.delete("/tunnel/{subdomain}")
 async def delete_active_tunnel(subdomain: str) -> dict[str, Any]:
     """
-    Принудительно закрывает и удаляет активный туннель по его поддомену.
+    Force-close and remove an active tunnel by its subdomain.
 
-    Parameters
-    ----------
-    subdomain : str
-        Идентификатор (поддомен) удаляемого туннеля.
+    Args:
+    ----
+        subdomain: The identifier (subdomain) of the tunnel to remove.
 
-    Returns
+    Returns:
     -------
-    dict[str, Any]
-        Словарь со статусом выполнения операции и сообщением об успешном удалении.
+        A dictionary describing the operation status and the success message.
 
-    Raises
+    Raises:
     ------
-    HTTPException
-        404 (Not Found): Если туннель с указанным поддоменом не найден в реестре.
-        500 (Internal Server Error): Если у туннеля отсутствует управляющий сокет.
+        HTTPException: 404 if the tunnel is not found; 500 if the tunnel has no control socket.
 
     """
     server = APIContext.get_server()

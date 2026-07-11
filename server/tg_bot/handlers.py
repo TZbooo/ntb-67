@@ -7,7 +7,7 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Обработчики команд и сообщений для Telegram-бота, интегрированного с прокси-сервером NTB-67."""
+"""Command and message handlers for the Telegram bot integrated with the NTB-67 proxy server."""
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
@@ -26,22 +26,22 @@ tg_bot_router = Router()
 
 
 def get_main_menu_keyboard() -> InlineKeyboardMarkup:
-    """Формирует инлайн-клавиатуру главного меню."""
+    """Build the inline keyboard for the main menu."""
     buttons = [
         [
             InlineKeyboardButton(
-                text="🔑 Мой API Ключ", callback_data="view_api_key"
+                text="🔑 My API Key", callback_data="view_api_key"
             ),
             InlineKeyboardButton(
-                text="🌐 Мои Туннели", callback_data="view_tunnels"
+                text="🌐 My Tunnels", callback_data="view_tunnels"
             ),
         ],
         [
             InlineKeyboardButton(
-                text="📚 Документация", url="https://github.com/netbiom/ntb-67"
+                text="📚 Documentation", url="https://github.com/netbiom/ntb-67"
             ),
             InlineKeyboardButton(
-                text="🔄 Обновить", callback_data="refresh_menu"
+                text="🔄 Refresh", callback_data="refresh_menu"
             ),
         ],
     ]
@@ -50,11 +50,9 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
 
 @tg_bot_router.message(CommandStart())
 async def start(message: Message) -> None:
-    """Обработчик команды /start. Регистрирует юзера и выводит интерактивное приветствие."""
+    """Handle /start by registering the user and showing an interactive greeting."""
     if message.from_user is None:
-        await message.answer(
-            "❌ Ошибка: не удалось определить ваш Telegram ID."
-        )
+        await message.answer("❌ Error: could not determine your Telegram ID.")
         return
 
     async with get_db_session() as session:
@@ -63,9 +61,9 @@ async def start(message: Message) -> None:
             user = await create_telegram_user(session, message.from_user.id)
 
     welcome_text = (
-        f"⚡ *Добро пожаловать в ntb-67 Proxy Server!*\n\n"
-        f"Привет, {message.from_user.first_name}. Ты успешно авторизован в системе локальных туннелей.\n\n"
-        f"Используй меню ниже для управления своими сессиями и конфигурациями."
+        f"⚡ *Welcome to ntb-67 Proxy Server!*\n\n"
+        f"Hello, {message.from_user.first_name}. You are successfully authenticated in the local tunnel system.\n\n"
+        f"Use the menu below to manage your sessions and configurations."
     )
 
     await message.answer(
@@ -77,9 +75,9 @@ async def start(message: Message) -> None:
 
 @tg_bot_router.message(Command("menu"))
 async def show_menu(message: Message) -> None:
-    """Команда /menu для быстрого вызова панели управления из любого места."""
+    """Handle /menu to quickly open the control panel from anywhere."""
     await message.answer(
-        text="🎛 *Панель управления ntb-67:*",
+        text="🎛 *ntb-67 control panel:*",
         parse_mode="Markdown",
         reply_markup=get_main_menu_keyboard(),
     )
@@ -87,8 +85,8 @@ async def show_menu(message: Message) -> None:
 
 @tg_bot_router.callback_query(F.data == "view_api_key")
 async def callback_view_api_key(callback: CallbackQuery) -> None:
-    """Выводит API-ключ в моноширинном формате для удобного копирования."""
-    # Защита от None: проверяем, что сообщение существует и у него есть метод редактирования
+    """Display the API key in a monospaced format for easy copying."""
+    # Guard against None: verify that the message exists and has an edit method
     if not isinstance(callback.message, Message):
         await callback.answer(
             "❌ Ошибка: сообщение недоступно для редактирования.",
@@ -104,9 +102,9 @@ async def callback_view_api_key(callback: CallbackQuery) -> None:
         return
 
     text = (
-        f"🔑 *Ваш персональный токен доступа:*\n\n"
+        f"🔑 *Your personal access token:*\n\n"
         f"`{user.api_key}`\n\n"
-        f"⚠️ _Никому не передавайте этот ключ. Он используется для аутентификации вашего локального клиента ntb-67._"
+        f"⚠️ _Do not share this key with anyone. It is used to authenticate your local ntb-67 client._"
     )
 
     keyboard = InlineKeyboardMarkup(
@@ -127,7 +125,7 @@ async def callback_view_api_key(callback: CallbackQuery) -> None:
 
 @tg_bot_router.callback_query(F.data == "view_tunnels")
 async def callback_view_tunnels(callback: CallbackQuery) -> None:
-    """Отображает информацию о доступных лимитах туннелей пользователя."""
+    """Show information about the user's available tunnel limits."""
     if not isinstance(callback.message, Message):
         await callback.answer(
             "❌ Ошибка: сообщение недоступно для редактирования.",
@@ -143,12 +141,12 @@ async def callback_view_tunnels(callback: CallbackQuery) -> None:
         return
 
     text = (
-        "🌐 *Управление туннелями ntb-67*\n\n"
-        f"📊 Твой текущий лимит: *{user.max_tunnels}* активных туннелей.\n\n"
-        "ℹ️ В текущей версии MVP вывод списка активных прокси находится в разработке. "
-        "Скоро здесь появится статистика трафика, пинг и возможность закрывать сессии.\n\n"
-        "⭐️ *PRO-тариф (Скоро):* Мы уже готовим платные подписки, на которых "
-        "можно будет расширить лимит и запускать больше одного туннеля одновременно!"
+        "🌐 *ntb-67 tunnel management*\n\n"
+        f"📊 Your current limit: *{user.max_tunnels}* active tunnels.\n\n"
+        "ℹ️ In the current MVP version, the list of active proxies is still under development. "
+        "Traffic statistics, ping, and session shutdown controls will appear here soon.\n\n"
+        "⭐️ *PRO tier (coming soon):* We are preparing paid subscriptions that will let you "
+        "increase the limit and run more than one tunnel at the same time!"
     )
 
     keyboard = InlineKeyboardMarkup(
@@ -169,7 +167,7 @@ async def callback_view_tunnels(callback: CallbackQuery) -> None:
 
 @tg_bot_router.callback_query(F.data.in_({"back_to_main", "refresh_menu"}))
 async def callback_back_to_main(callback: CallbackQuery) -> None:
-    """Возвращает интерфейс в состояние главного меню."""
+    """Return the interface to the main menu state."""
     if not isinstance(callback.message, Message):
         await callback.answer(
             "❌ Ошибка: сообщение недоступно для редактирования.",
@@ -178,8 +176,8 @@ async def callback_back_to_main(callback: CallbackQuery) -> None:
         return
 
     welcome_text = (
-        "⚡ *Добро пожаловать в ntb-67 Proxy Server!*\n\n"
-        "Используй меню ниже для управления своими сессиями и конфигурациями."
+        "⚡ *Welcome to ntb-67 Proxy Server!*\n\n"
+        "Use the menu below to manage your sessions and configurations."
     )
     try:
         await callback.message.edit_text(

@@ -7,7 +7,7 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Файл определения локальных, для модуля логики телеграм-интерфейса, моделей данных."""
+"""Data models used by the Telegram interface logic."""
 
 import secrets
 
@@ -18,12 +18,12 @@ from server.database import Base
 
 
 def generate_api_key() -> str:
-    """Генерирует криптографически безопасный случайный токен для API."""
+    """Generate a cryptographically secure random API token."""
     return f"ntb_{secrets.token_urlsafe(32)}"
 
 
 class TelegramUser(Base):
-    """Модель пользователя, зарегистрированного через Telegram-бота."""
+    """Model for a user registered through the Telegram bot."""
 
     __tablename__ = "telegram_users"
 
@@ -42,14 +42,14 @@ class TelegramUser(Base):
     )
 
     def __repr__(self) -> str:
-        """Возвращает строковое представление объекта TelegramUser для отладки и логов."""
+        """Return a debugging-friendly string representation of TelegramUser."""
         return (
             f"<TelegramUser tg_id={self.tg_id} max_tunnels={self.max_tunnels}>"
         )
 
 
 class UserSubdomain(Base):
-    """Модель выделенного пользователю поддомена для маршрутизации."""
+    """Model for a subdomain assigned to a user for routing."""
 
     __tablename__ = "user_subdomains"
 
@@ -72,5 +72,5 @@ class UserSubdomain(Base):
     )
 
     def __repr__(self) -> str:
-        """Возвращает строковое представление объекта UserSubdomain."""
+        """Return a debugging-friendly string representation of UserSubdomain."""
         return f"<UserSubdomain id={self.id} subdomain={self.subdomain} user_id={self.user_id}>"

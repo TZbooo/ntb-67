@@ -8,10 +8,10 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Инициализация асинхронного движка и фабрики сессий SQLAlchemy.
+Initialize the asynchronous SQLAlchemy engine and session factory.
 
-Настраивает подключение к PostgreSQL через asyncpg, предоставляет базовый
-класс для ORM-моделей и генератор зависимостей сессионного слоя для ntb-67.
+This module configures the PostgreSQL connection through asyncpg, provides a
+base class for ORM models, and exposes the database session dependency for NTB-67.
 """
 
 from collections.abc import AsyncGenerator
@@ -40,29 +40,14 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 class Base(DeclarativeBase):
-    """Базовый класс для всех моделей базы данных проекта ntb-67."""
+    """Base class for all database models in the NTB-67 project."""
 
     pass
 
 
 @asynccontextmanager
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Создает и изолирует асинхронную сессию базы данных.
-
-    Используется в качестве контекстного менеджера или зависимости FastAPI.
-    Автоматически фиксирует транзакцию при успешном завершении блока или
-    выполняет откат изменений в случае исключения.
-
-    Yields
-    ------
-        Экземпляр активной асинхронной сессии AsyncSession.
-
-    Raises
-    ------
-        Exception: Любое исключение, возникшее в процессе выполнения транзакции.
-
-    """
+    """Create and isolate an asynchronous database session for use in the app."""
     async with AsyncSessionLocal() as session:
         try:
             yield session

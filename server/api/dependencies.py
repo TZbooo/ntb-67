@@ -7,7 +7,7 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Зависимости и контекст для обеспечения безопасности и работы REST API."""
+"""Dependencies and context for securing and operating the REST API."""
 
 import os
 
@@ -20,18 +20,18 @@ X_TOKEN_HEADER = APIKeyHeader(name="X-NTB-Admin-Token", auto_error=False)
 
 
 class APIContext:
-    """Обеспечивает доступ к глобальному контексту TCP-сервера."""
+    """Provide access to the global TCP server context."""
 
     _server_instance: NTBServer | None = None
 
     @classmethod
     def init(cls, server: NTBServer) -> None:
         """
-        Инициализирует контекст инстансом запущенного TCP-сервера.
+        Initialize the context with the running TCP server instance.
 
         Args:
         ----
-            server: Текущий работающий экземпляр прокси-сервера.
+            server: The currently running proxy server instance.
 
         """
         cls._server_instance = server
@@ -39,43 +39,43 @@ class APIContext:
     @classmethod
     def get_server(cls) -> NTBServer:
         """
-        Возвращает текущий инстанс TCP-сервера для работы эндпоинтов.
+        Return the current TCP server instance for endpoint usage.
 
         Returns
         -------
-            Текущий работающий экземпляр NTBServer.
+            The current NTBServer instance.
 
         Raises
         ------
-            RuntimeError: Если контекст не был предварительно инициализирован.
+            RuntimeError: If the context has not been initialized.
 
         """
         if cls._server_instance is None:
-            raise RuntimeError("APIContext не был инициализирован.")
+            raise RuntimeError("APIContext has not been initialized.")
         return cls._server_instance
 
 
 async def verify_admin_token(token: str = Security(X_TOKEN_HEADER)) -> str:
     """
-    Проверяет токен авторизации из заголовков запроса.
+    Validate the authorization token from the request headers.
 
     Args:
     ----
-        token: Строковый токен, переданный в заголовке X-NTB-Admin-Token.
+        token: The token supplied in the X-NTB-Admin-Token header.
 
     Returns:
     -------
-        Валидированный токен авторизации.
+        The validated authorization token.
 
     Raises:
     ------
-        HTTPException: Если токен отсутствует или не совпадает с эталонным.
+        HTTPException: If the token is missing or does not match the expected value.
 
     """
     expected_token = os.getenv("NTB_ADMIN_TOKEN", "fallback_secret_token")
     if not token or token != expected_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный или отсутствующий админ-токен.",
+            detail="Invalid or missing admin token.",
         )
     return token

@@ -8,10 +8,10 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Конфигурация окружения и параметров базы данных проекта ntb-67.
+Environment and database configuration for the NTB-67 project.
 
-Загружает переменные среды из файлов окружения и предоставляет их в виде
-типизированного объекта настроек Pydantic.
+This module loads environment variables and exposes them as a typed Pydantic
+settings object.
 """
 
 from pydantic import computed_field
@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ProjectSettings(BaseSettings):
-    """Конфигурация проекта ntb-67, загружаемая из переменных окружения."""
+    """Project configuration for NTB-67 loaded from environment variables."""
 
     TG_BOT_TOKEN: str
 
@@ -40,13 +40,13 @@ class ProjectSettings(BaseSettings):
     @computed_field
     @property
     def tunnel_live_time_seconds(self) -> float:
-        """Возвращает время жизни туннеля, переведенное из часов в секунды."""
+        """Convert tunnel lifetime from hours to seconds."""
         return self.TUNNEL_LIVE_TIME_HOURS * 3600
 
     @computed_field
     @property
     def database_url(self) -> str:
-        """Формирует строку подключения к PostgreSQL на основе параметров."""
+        """Build the PostgreSQL connection string from the configured settings."""
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"

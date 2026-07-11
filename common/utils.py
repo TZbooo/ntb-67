@@ -8,27 +8,17 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Вспомогательные утилиты для работы с сетевыми потоками Asyncio.
+Helper utilities for working with asyncio stream sockets.
 
-Предоставляет низкоуровневые инструменты для безопасного закрытия сокетов
-и организации однонаправленной асинхронной перекачки байт (пайпинга) трафика.
+This module provides low-level tools for safely closing sockets and piping
+bytes from one stream to another.
 """
 
 import asyncio
 
 
 async def close_writer(writer: asyncio.StreamWriter) -> None:
-    """
-    Безопасно завершает работу сокета и закрывает StreamWriter.
-
-    Подавляет любые возникающие исключения (например, ConnectionResetError),
-    гарантируя корректное освобождение системных ресурсов.
-
-    Args:
-    ----
-        writer: Экземпляр закрываемого асинхронного потока записи.
-
-    """
+    """Close a stream writer safely and suppress any cleanup errors."""
     writer.close()
     try:
         await writer.wait_closed()
@@ -39,19 +29,7 @@ async def close_writer(writer: asyncio.StreamWriter) -> None:
 async def pipe(
     reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 ) -> None:
-    """
-    Организует односторонний стриминг байт из reader в writer.
-
-    Читает данные из входящего потока блоками по 4096 байт и перенаправляет их
-    в поток записи до тех пор, пока не будет достигнут EOF или не произойдет
-    сетевой сбой. В конце автоматически закрывает целевой writer.
-
-    Args:
-    ----
-        reader: Асинхронный поток для чтения данных.
-        writer: Асинхронный поток для записи данных.
-
-    """
+    """Stream bytes from a reader to a writer until EOF or a transport error."""
     try:
         while True:
             data = await reader.read(4096)

@@ -8,12 +8,12 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Клиентская часть сервиса туннелирования ntb-67.
+Client package for the NTB-67 tunneling service.
 
-Данный пакет содержит логику инициализации сессий, обработки управляющих команд
-от сервера маршрутизации и проброса сетевого трафика на локальные порты.
+This package exposes the core tunnel client and related runtime components used
+for session initialization, server command handling, and local traffic bridging.
 """
 
-from client.tunnel_client import NTBClient
+from client.core import NTBClient
 
 __all__ = ["NTBClient"]

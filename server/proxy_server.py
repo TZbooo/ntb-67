@@ -8,11 +8,11 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Серверное приложение для работы многопользовательского обратного туннеля.
+Server application for multi-user reverse tunneling.
 
-Данный модуль содержит реализацию асинхронного сервера, который динамически
-распределяет поддомены между клиентами, парсит входящие HTTP-заголовки Host
-и маршрутизирует трафик от Nginx к соответствующим туннелям.
+This module implements an asynchronous server that dynamically assigns
+subdomains to clients, parses incoming Host headers, and routes traffic from
+Nginx to the appropriate tunnels.
 """
 
 import asyncio
@@ -27,27 +27,26 @@ from .tg_bot.crud import get_telegram_user_by
 
 
 class NTBServer:
-    """Сервер туннелирования, координирующий трафик на основе поддоменов."""
+    """Tunnel server that coordinates traffic based on subdomains."""
 
     def __init__(self):
-        """Инициализирует NTBServer с реестром активных поддоменов."""
+        """Initialize NTBServer with a registry of active subdomains."""
         self.active_tunnels = TunnelRegistry()
 
     async def handle_client_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         """
-        Обрабатывает служебные и транспортные подключения от NTBClient.
+        Handle control and data connections from an NTB client.
 
-        Метод классифицирует входящий запрос по стартовому маркеру. Если пришел
-        сигнал `INIT`, инициализируется или восстанавливается сессия управления.
-        Если пришел маркер `DATA`, пара сокетов регистрируется в пуле ожидания
-        конкретного поддомена для последующей проксимизации.
+        The method classifies the incoming request by its initial marker. An
+        ``INIT`` message starts or restores the control session, while a
+        ``DATA`` message registers a socket pair for later proxying.
 
         Args:
         ----
-            reader: Асинхронный поток чтения сокета.
-            writer: Асинхронный поток записи сокета.
+            reader: The socket's asynchronous reading stream.
+            writer: The socket's asynchronous writing stream.
 
         """
         subdomain = None
@@ -67,7 +66,7 @@ class NTBServer:
 
                 if not await self._authenticate_user(api_key):
                     print(
-                        f"🚫 Отклонено: попытка подключения с невалидным API-ключом: {api_key[:10]}..."
+                        f"🚫 Rejected: connection attempt with an invalid API key: {api_key[:10]}..."
                     )
                     writer.write(b"ERROR:Invalid API Key\n")
                     await writer.drain()
@@ -78,51 +77,47 @@ class NTBServer:
                     if is_valid_subdomain(requested_subdomain):
                         if self.active_tunnels.contains(requested_subdomain):
                             subdomain = requested_subdomain
-                            print(
-                                f"✅ Возобнавляем существующий туннель: {subdomain}"
-                            )
+                            print(f"✅ Resuming existing tunnel: {subdomain}")
                         else:
-                            # Домен наш, но сессия в памяти уже стерлась (клиент долго спал)
-                            # Создаем структуру заново с тем же именем
+                            # The domain is ours, but the session in memory has already expired.
+                            # Recreate the structure with the same name.
                             subdomain = requested_subdomain
                             self.active_tunnels.register(subdomain)
                             print(
-                                f"⏳ Сессия истёкла, но домен валиден. Пересоздаем туннель: {subdomain}"
+                                f"⏳ Session expired, but the domain is valid. Recreating tunnel: {subdomain}"
                             )
                     else:
                         print(
-                            f"⚠️ Клиент пытается захватить домен (хакер): {requested_subdomain}"
+                            f"⚠️ Client attempted to claim a domain (possible abuse): {requested_subdomain}"
                         )
                 if not subdomain:
                     subdomain = (
                         generate_free_subdomain()
-                    )  # Генерируем новый поддомен для клиента
+                    )  # Generate a new subdomain for the client
                     while self.active_tunnels.contains(subdomain):
                         subdomain = generate_free_subdomain()
 
-                    print(
-                        f"🚀 Регистрируем новый бесплатный туннель: {subdomain}"
-                    )
+                    print(f"🚀 Registering a new free tunnel: {subdomain}")
                     self.active_tunnels.register(subdomain)
                 self.active_tunnels.activate_control(subdomain, writer)
-                # Отправляем сгенерированный поддомен обратно клиенту
+                # Send the generated subdomain back to the client
                 writer.write(f"ASSIGNED:{subdomain}\n".encode("utf-8"))
                 await writer.drain()
 
                 while True:
-                    # Ждем keep-alive от клиента или новые команды. Таймаут 10 мин.
+                    # Wait for a keep-alive or new commands from the client. Timeout: 10 minutes.
                     data = await asyncio.wait_for(
                         reader.read(1024), timeout=10 * 60.0
                     )
 
                     if data == b"":
-                        # Клиент корректно закрыл сокет с той стороны
+                        # The client closed the socket gracefully on its side
                         print(
-                            f"🔌 Клиент {subdomain} корректно закрыл соединение."
+                            f"🔌 Client {subdomain} closed the connection gracefully."
                         )
                         break
 
-            # Если клиент открыл сокет для передачи данных трафика
+            # If the client opened a socket for forwarding traffic
             elif line.startswith("DATA:"):
                 subdomain = line.split(":", 1)[1].strip()
                 if self.active_tunnels.contains(subdomain):
@@ -130,28 +125,26 @@ class NTBServer:
                         (reader, writer)
                     )
                     print(
-                        f"📦 Сокет данных добавлен в пул для поддомена: {subdomain}"
+                        f"📦 Data socket added to the queue for subdomain: {subdomain}"
                     )
                 else:
-                    print(
-                        f"⚠️ Токен данных для неизвестного поддомена: {subdomain}"
-                    )
+                    print(f"⚠️ Data token for an unknown subdomain: {subdomain}")
                     await close_writer(writer)
 
         except (asyncio.TimeoutError, ConnectionResetError):
             print(
-                f"⏱️ Управляющее соединение туннеля {subdomain} отвалилось по таймауту/обрыву."
+                f"⏱️ The control connection for tunnel {subdomain} dropped due to timeout or disconnect."
             )
         except Exception as e:
-            print(f"❌ Ошибка при обработке клиента ({subdomain}): {e}")
+            print(f"❌ Error while handling client ({subdomain}): {e}")
         finally:
-            # Сюда управление попадет ТОЛЬКО в двух случаях:
-            # 1. Произошло исключение (внутри INIT или DATA)
-            # 2. Произошел break из бесконечного цикла удержания туннеля (Ветка Б)
-            # Если это был успешный DATA-сокет, мы вышли через return выше, и этот блок не затронет его.
+            # This block executes only in two cases:
+            # 1. An exception occurred (inside INIT or DATA)
+            # 2. The loop that kept the tunnel alive exited via break
+            # If this was a successful DATA socket, we returned earlier and this block is skipped.
             if subdomain and line.startswith("INIT"):
                 print(self.active_tunnels)
-                print(f"🧹 Очистка ресурсов для поддомена: {subdomain}")
+                print(f"🧹 Cleaning up resources for subdomain: {subdomain}")
                 if self.active_tunnels.contains(subdomain):
                     self.active_tunnels.remove(subdomain)
                 await close_writer(writer)
@@ -160,33 +153,33 @@ class NTBServer:
         self, web_reader: asyncio.StreamReader, web_writer: asyncio.StreamWriter
     ) -> None:
         """
-        Маршрутизирует входящий HTTP-запрос от Nginx к клиенту туннеля.
+        Route an incoming HTTP request from Nginx to the tunnel client.
 
-        Метод считывает первичные HTTP-заголовки, извлекает целевой поддомен,
-        запрашивает у CLI-клиента создание новой транспортной пары сокетов по
-        каналу управления и инициирует двусторонний мост обмена данными.
+        The method reads the initial HTTP headers, extracts the target subdomain,
+        asks the client to create a new transport socket pair over the control
+        channel, and initiates a bidirectional data bridge.
 
         Args:
         ----
-            web_reader: Поток чтения от обратного прокси (Nginx).
-            web_writer: Поток записи к обратному прокси (Nginx).
+            web_reader: Read stream from the reverse proxy (Nginx).
+            web_writer: Write stream to the reverse proxy (Nginx).
 
         """
         try:
-            # Читаем первый чанк данных, чтобы вытащить HTTP-заголовки
+            # Read the first chunk of data to extract the HTTP headers
             header_chunk = await web_reader.readuntil(b"\r\n\r\n")
         except Exception:
             await close_writer(web_writer)
             return
 
-        # Ищем заголовок Host в байтиках
+        # Look for the Host header in the bytes
         subdomain = extract_subdomain(header_chunk)
 
         if not subdomain or not self.active_tunnels.contains(subdomain):
             print(
-                f"🚫 Запрос на неизвестный или оффлайн поддомен: {subdomain}.24tunl.ru"
+                f"🚫 Request for an unknown or offline subdomain: {subdomain}.24tunl.ru"
             )
-            # Отдаем красивую заглушку 404
+            # Return a neat 404 placeholder
             html_body = b"<h1>404 Tunnel Not Found</h1><p>ntb-67: Active tunnel for this subdomain not found.</p>"
             response = (
                 b"HTTP/1.1 404 Not Found\r\n"
@@ -199,11 +192,13 @@ class NTBServer:
             await close_writer(web_writer)
             return
 
-        # Если туннель онлайн, просим у него DATA-соединение
+        # If the tunnel is online, ask it for a DATA connection
         tunnel = self.active_tunnels.get(subdomain)
-        # Убедимся, что у туннеля есть управляющее соединение
+        # Ensure the tunnel has a control connection
         if not tunnel.control:
-            print(f"❌ Управляющее соединение клиента {subdomain} отсутствует")
+            print(
+                f"❌ The client control connection for {subdomain} is missing"
+            )
             await close_writer(web_writer)
             return
 
@@ -212,7 +207,7 @@ class NTBServer:
             await tunnel.control.drain()
         except Exception:
             print(
-                f"❌ Не смогли отправить команду запроса сокета клиенту {subdomain}"
+                f"❌ Failed to send a socket request to the client for {subdomain}"
             )
             await close_writer(web_writer)
             return
@@ -222,15 +217,17 @@ class NTBServer:
                 tunnel.data_queue.get(), timeout=5.0
             )
         except asyncio.TimeoutError:
-            print(f"⏱️ Клиент {subdomain} не успел выделить сокет под запрос.")
+            print(
+                f"⏱️ Client {subdomain} did not allocate a socket in time for the request."
+            )
             await close_writer(web_writer)
             return
 
-        # Сначала отдаем в туннель заголовки, которые мы уже прочитали из веб-сокета
+        # Send the headers already read from the web socket to the tunnel first
         data_writer.write(header_chunk)
         await data_writer.drain()
 
-        # Запускаем мост
+        # Start the bridge
         await self.bridge(web_reader, web_writer, data_reader, data_writer)
 
     async def bridge(
@@ -241,18 +238,17 @@ class NTBServer:
         data_writer: asyncio.StreamWriter,
     ) -> None:
         """
-        Организует полнодуплексный обмен байтами между веб-сокетом и клиентом.
+        Bridge traffic bidirectionally between the web socket and the client.
 
-        Агрегирует две независимые асинхронные задачи перекачки данных с помощью
-        `asyncio.gather`, блокируя выполнение до полного закрытия сессии с любой
-        из сторон.
+        The method runs two independent byte-streaming tasks through
+        ``asyncio.gather`` and blocks until either side closes the session.
 
         Args:
         ----
-            web_reader: Чтение из веб-сокета (запросы пользователя).
-            web_writer: Запись в веб-сокет (ответы пользователю).
-            data_reader: Чтение из туннельного сокета (ответы от локального хоста).
-            data_writer: Запись в туннельный сокет (запросы к локальному хосту).
+            web_reader: Read stream from the web socket (user requests).
+            web_writer: Write stream to the web socket (user responses).
+            data_reader: Read stream from the tunnel socket (responses from the local host).
+            data_writer: Write stream to the tunnel socket (requests to the local host).
 
         """
         await asyncio.gather(
@@ -260,7 +256,7 @@ class NTBServer:
         )
 
     async def _authenticate_user(self, api_key: str) -> bool:
-        """Проверяет существование API-ключе в базе данных PostgreSQL."""
+        """Check whether the API key exists in PostgreSQL."""
         async with get_db_session() as session:
             user = await get_telegram_user_by(session, api_key=api_key)
             return user is not None

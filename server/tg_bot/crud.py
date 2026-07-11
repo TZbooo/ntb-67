@@ -7,7 +7,7 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""Определения CRUD-операций для работы с данными пользователя."""
+"""CRUD definitions for working with Telegram user data."""
 
 from typing import Any
 
@@ -21,24 +21,21 @@ async def get_telegram_user_by(
     session: AsyncSession, **kwargs: Any
 ) -> TelegramUser | None:
     """
-    Универсальный метод поиска пользователя по любому переданному полю.
+    Look up a Telegram user by any supplied field.
 
-    Примеры использования:
-    --------------------
-    user = await get_user_by(session, tg_id=123456)
-    user = await get_user_by(session, api_key="ntb_...")
+    Examples:
+    --------
+        user = await get_user_by(session, tg_id=123456)
+        user = await get_user_by(session, api_key="ntb_...")
 
-    Parameters
-    ----------
-    session : AsyncSession
-        Активная асинхронная сессия SQLAlchemy.
-    **kwargs : Any
-        Параметры фильтрации (например, tg_id=..., api_key=...).
+    Args:
+    ----
+        session: An active SQLAlchemy async session.
+        **kwargs: Filter parameters such as tg_id or api_key.
 
-    Returns
+    Returns:
     -------
-    TelegramUser | None
-        Объект пользователя, если найден, иначе None.
+        The TelegramUser object if found, otherwise None.
 
     """
     query = select(TelegramUser).filter_by(**kwargs)
@@ -50,29 +47,21 @@ async def create_telegram_user(
     session: AsyncSession, tg_id: int
 ) -> TelegramUser:
     """
-    Создает новую запись пользователя Telegram с автоматически сгенерированным API-ключом.
+    Create a new Telegram user record with an automatically generated API key.
 
-    Parameters
-    ----------
-    session : AsyncSession
-        Активная асинхронная сессия SQLAlchemy.
-    tg_id : int
-        Уникальный Telegram ID пользователя.
+    Args:
+    ----
+        session: An active SQLAlchemy async session.
+        tg_id: The user's unique Telegram ID.
 
-    Returns
+    Returns:
     -------
-    TelegramUser
-        Объект созданного пользователя, включая сгенерированный API-ключ.
-
-    Raises
-    ------
-    Exception
-        Если при фиксации транзакции в базе данных возникла ошибка.
+        The created TelegramUser object, including the generated API key.
 
     """
     db_user = TelegramUser(tg_id=tg_id)
     session.add(db_user)
     await (
         session.flush()
-    )  # Заставляет SQLAlchemy сгенерировать default-значения и ID
+    )  # Force SQLAlchemy to generate default values and an ID
     return db_user

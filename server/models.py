@@ -8,11 +8,11 @@
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
 """
-Управление реестром активных сетевых туннелей.
+Management of the registry of active network tunnels.
 
-Данный модуль предоставляет абстракции для безопасного отслеживания сессий,
-связывания управляющих соединений (Control Plane) и хранения асинхронных
-очередей передачи данных (Data Plane) для проекта ntb-67.
+This module provides abstractions for safely tracking sessions, binding
+control-plane connections, and storing asynchronous data-plane queues for the
+NTB-67 project.
 """
 
 import asyncio
@@ -22,10 +22,10 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class TunnelInfoDTO:
     """
-    Немутируемый объект переноса данных (DTO) с метаданными туннеля.
+    Immutable data-transfer object with tunnel metadata.
 
-    Безопасно отдается во внешние слои приложения (например, в REST API),
-    не раскрывая внутренние ссылки на сетевые сокеты и очереди.
+    It is safe to pass to external layers of the application (for example, the
+    REST API) without exposing internal references to sockets or queues.
     """
 
     subdomain: str
@@ -35,67 +35,67 @@ class TunnelInfoDTO:
 
 @dataclass
 class TunnelSession:
-    """Представляет активную сессию туннеля клиента."""
+    """Represents an active client tunnel session."""
 
     data_queue: asyncio.Queue[tuple[asyncio.StreamReader, asyncio.StreamWriter]]
     control: asyncio.StreamWriter | None = None
 
 
 class TunnelRegistry:
-    """Инкапсулирует хранилище активных туннелей."""
+    """Encapsulates the storage for active tunnels."""
 
     def __init__(self):
-        """Инициализирует пустой реестр туннелей."""
+        """Initialize an empty tunnel registry."""
         self._tunnels: dict[str, TunnelSession] = {}
 
     def get(self, subdomain: str) -> TunnelSession:
         """
-        Возвращает активную сессию туннеля по его поддомену.
+        Return the active tunnel session for the given subdomain.
 
         Args:
         ----
-            subdomain: Уникальное имя зарегистрированного поддомена.
+            subdomain: Unique name of the registered subdomain.
 
         Returns:
         -------
-            Объект TunnelSession, содержащий очереди данных и control-сокет.
+            A TunnelSession object containing the data queue and the control socket.
 
         Raises:
         ------
-            KeyError: Если туннель для указанного поддомена не найден.
+            KeyError: If no tunnel exists for the requested subdomain.
 
         """
         return self._tunnels[subdomain]
 
     def get_all_info(self) -> list[TunnelInfoDTO]:
         """
-        Возвращает изолированный список с метаданными всех активных соединений.
+        Return a safe snapshot of metadata for all active tunnel sessions.
 
-        Метод извлекает текущий размер асинхронной очереди данных и IP-адрес
-        управляющего соединения (Control Plane), предотвращая утечку ссылок
-        на живые объекты StreamWriter/Reader.
+        The method reads the current size of the asynchronous data queue and the
+        IP address of the control-plane connection, while avoiding references to
+        live StreamWriter/Reader objects.
 
         Returns
         -------
-            Список замороженных объектов TunnelInfoDTO, безопасных для чтения.
+            A list of immutable TunnelInfoDTO objects safe for external use.
 
         """
         snapshots: list[TunnelInfoDTO] = []
         for subdomain, session in self._tunnels.items():
             client_ip = None
 
-            # Извлекаем IP-адрес клиента из StreamWriter служебного канала
+            # Extract the client's IP address from the control-plane StreamWriter
             if session.control and not session.control.is_closing():
                 try:
                     peername = session.control.get_extra_info("peername")
                     if peername:
-                        # peername для IPv4/IPv6 — это кортеж, где первый элемент — IP
+                        # For IPv4/IPv6, peername is a tuple whose first element is the IP
                         client_ip = str(peername[0])
                 except (RuntimeError, ValueError):
-                    # На случай, если сокет успел закрыться в момент итерации
+                    # In case the socket closed during iteration
                     client_ip = None
 
-            # Безопасно считываем текущий размер очереди без мутации данных
+            # Read the current queue size without mutating the data
             queue_size = session.data_queue.qsize()
 
             snapshots.append(
@@ -109,15 +109,15 @@ class TunnelRegistry:
 
     def register(self, subdomain: str) -> TunnelSession:
         """
-        Создает и регистрирует новую сессию туннеля.
+        Create and register a new tunnel session.
 
         Args:
         ----
-            subdomain: Уникальное имя выделяемого поддомена.
+            subdomain: Unique name of the allocated subdomain.
 
         Returns:
         -------
-            Инициализированный и сохраненный объект TunnelSession.
+            An initialized and stored TunnelSession object.
 
         """
         session = TunnelSession(data_queue=asyncio.Queue())
@@ -128,41 +128,41 @@ class TunnelRegistry:
         self, subdomain: str, writer: asyncio.StreamWriter
     ) -> None:
         """
-        Привязывает активный управляющий сокет к сессии поддомена.
+        Attach the active control socket to the tunnel session.
 
-        Используется при первичной регистрации или при бесшовном переподключении
-        клиента в случае кратковременного сбоя сети.
+        This is used during initial registration or after a client reconnects
+        following a brief network interruption.
 
         Args:
         ----
-            subdomain: Имя поддомена, для которого обновляется соединение.
-            writer: Асинхронный поток записи (StreamWriter) служебного канала.
+            subdomain: The subdomain whose connection is being updated.
+            writer: The control-channel StreamWriter.
 
         """
         self._tunnels[subdomain].control = writer
 
     def remove(self, subdomain: str) -> None:
         """
-        Удаляет сессию туннеля из реестра и освобождает поддомен.
+        Remove a tunnel session from the registry and free its subdomain.
 
         Args:
         ----
-            subdomain: Имя поддомена, который необходимо закрыть.
+            subdomain: The subdomain that should be closed.
 
         """
         self._tunnels.pop(subdomain, None)
 
     def contains(self, subdomain: str) -> bool:
         """
-        Проверяет, зарегистрирован ли указанный поддомен в системе.
+        Check whether the given subdomain is registered in the system.
 
         Args:
         ----
-            subdomain: Проверяемое имя поддомена.
+            subdomain: Subdomain to validate.
 
         Returns:
         -------
-            True, если сессия активна, иначе False.
+            True if the session is active, otherwise False.
 
         """
         return subdomain in self._tunnels
