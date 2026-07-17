@@ -20,7 +20,7 @@ import hmac
 import secrets
 import time
 
-from .config import project_settings
+from server.config import project_settings
 
 
 def generate_free_subdomain() -> str:

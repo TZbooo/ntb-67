@@ -18,19 +18,19 @@ Nginx to the appropriate tunnels.
 import asyncio
 
 from common.utils import close_writer, pipe
+from server.database import get_db_session
+from server.tg_bot.crud import get_telegram_user_by
 
-from .database import get_db_session
 from .http_utils import extract_subdomain
 from .models import TunnelRegistry
 from .security import generate_free_subdomain, is_valid_subdomain
-from .tg_bot.crud import get_telegram_user_by
 
 
-class NTBServer:
+class ReverseProxyServer:
     """Tunnel server that coordinates traffic based on subdomains."""
 
     def __init__(self):
-        """Initialize NTBServer with a registry of active subdomains."""
+        """Initialize ReverseProxyServer with a registry of active subdomains."""
         self.active_tunnels = TunnelRegistry()
 
     async def handle_client_connection(

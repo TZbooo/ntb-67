@@ -31,7 +31,7 @@ from fastapi import FastAPI, Request
 from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
-from server.proxy_server import NTBServer
+from server.core import ReverseProxyServer
 from server.tg_bot.handlers import tg_bot_router
 
 tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
@@ -67,16 +67,16 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
 
 async def main() -> None:
     """Entry point that starts the socket servers and API in one event loop."""
-    ntb_server = NTBServer()
-    APIContext.init(ntb_server)
+    reverse_proxy_server = ReverseProxyServer()
+    APIContext.init(reverse_proxy_server)
 
     control_server = await asyncio.start_server(
-        ntb_server.handle_client_connection, host="0.0.0.0", port=9000
+        reverse_proxy_server.handle_client_connection, host="0.0.0.0", port=9000
     )
     print("🚀 TCP control server started on port 9000")
 
     web_server = await asyncio.start_server(
-        ntb_server.handle_web_request, host="0.0.0.0", port=8000
+        reverse_proxy_server.handle_web_request, host="0.0.0.0", port=8000
     )
     print("🌐 TCP web traffic server started on port 8000")
 

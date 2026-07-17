@@ -14,7 +14,3 @@ This package handles external traffic routing (Control and Data Plane),
 management of active subdomain sessions, socket multiplexing, and coordination
 of connected CLI clients.
 """
-
-from server.proxy_server import NTBServer
-
-__all__ = ["NTBServer"]

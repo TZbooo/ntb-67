@@ -14,7 +14,7 @@ import os
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
-from server.proxy_server import NTBServer
+from server.core.reverse_proxy_server import ReverseProxyServer
 
 X_TOKEN_HEADER = APIKeyHeader(name="X-NTB-Admin-Token", auto_error=False)
 
@@ -22,10 +22,10 @@ X_TOKEN_HEADER = APIKeyHeader(name="X-NTB-Admin-Token", auto_error=False)
 class APIContext:
     """Provide access to the global TCP server context."""
 
-    _server_instance: NTBServer | None = None
+    _server_instance: ReverseProxyServer | None = None
 
     @classmethod
-    def init(cls, server: NTBServer) -> None:
+    def init(cls, server: ReverseProxyServer) -> None:
         """
         Initialize the context with the running TCP server instance.
 
@@ -37,13 +37,13 @@ class APIContext:
         cls._server_instance = server
 
     @classmethod
-    def get_server(cls) -> NTBServer:
+    def get_server(cls) -> ReverseProxyServer:
         """
         Return the current TCP server instance for endpoint usage.
 
         Returns
         -------
-            The current NTBServer instance.
+            The current ReverseProxyServer instance.
 
         Raises
         ------
