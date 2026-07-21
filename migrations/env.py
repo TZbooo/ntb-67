@@ -22,6 +22,7 @@ if config.config_file_name is not None:
 
 from server.database import Base
 from server.tg_bot.models import TelegramUser
+from server.models import User, Role
 
 target_metadata = Base.metadata
 

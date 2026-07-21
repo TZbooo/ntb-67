@@ -27,11 +27,13 @@ import uvicorn
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI, Request
+from sqladmin import Admin
 
 from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
 from server.core import ReverseProxyServer
+from server.database import engine
 from server.tg_bot.handlers import tg_bot_router
 
 tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
@@ -53,6 +55,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
+
+admin = Admin(app, engine)
 
 
 @app.post("/bot/webhook")
