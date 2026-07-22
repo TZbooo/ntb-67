@@ -95,6 +95,8 @@ async def main() -> None:
         app="server.main:app",
         host="0.0.0.0",
         port=8080,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
         loop="asyncio",
         log_level="info",
     )
