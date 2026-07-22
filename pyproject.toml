@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ntb-67-client"
-version = "0.1.5"
+version = "0.1.6"
 description = "Asyncio Tunneling Proxy Client — alternative for ngrok/localtunnel"
 readme = "README.md"
 authors = [
@@ -16,7 +16,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
-dependencies = [] # Если появятся внешние библиотеки вроде httpx, пишите их сюда
+dependencies = [
+    "fastapi==0.138.0",
+    "textual==8.2.8",
+]
 
 [project.urls]
 Homepage = "https://github.com/TZbooo/ntb-67"
@@ -33,12 +36,12 @@ line-length = 80
 
 [tool.ruff.lint]
 select = [
-    "E", "W",  # Ошибки и предупреждения pycodestyle
-    "F",       # Пропущенные импорты, неиспользованные переменные
-    "I",       # Авто-сортировка импортов (isort)
-    "D",       # Проверки докстрингов pydocstyle
+    "E", "W",
+    "F",
+    "I",
+    "D",
 ]
 ignore = [
-    "D203", "D212",  # Убираем конфликты стандартов докстрингов
-    "E501",          # Игнорируем слишком длинные строки (чтобы не ругался на лицензию в шапках)
+    "D203", "D212",
+    "E501",
 ]
