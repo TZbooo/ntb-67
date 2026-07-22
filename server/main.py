@@ -28,6 +28,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI, Request
 from sqladmin import Admin
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from server.admin.views import RoleAdmin, UserAdmin
 from server.api.dependencies import APIContext
@@ -55,6 +56,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
+app.add_middleware(
+    ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1", "localhost"]
+)
 app.include_router(router)
 
 admin = Admin(app, engine)
