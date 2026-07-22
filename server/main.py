@@ -29,6 +29,7 @@ from aiogram.types import Update
 from fastapi import FastAPI, Request
 from sqladmin import Admin
 
+from server.admin.views import RoleAdmin, UserAdmin
 from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.config import project_settings
@@ -57,6 +58,8 @@ app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
 
 admin = Admin(app, engine)
+admin.add_view(UserAdmin)
+admin.add_view(RoleAdmin)
 
 
 @app.post("/bot/webhook")
