@@ -29,6 +29,8 @@ from aiogram.types import Update
 from fastapi import FastAPI, Request
 from sqladmin import Admin
 
+from server.admin.auth import authentication_backend
+from server.admin.bootstrap import init_first_superuser
 from server.admin.views import RoleAdmin, UserAdmin
 from server.api.dependencies import APIContext
 from server.api.routes import router
@@ -44,6 +46,8 @@ dp = Dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the FastAPI lifecycle by enabling and disabling the webhook."""
+    await init_first_superuser()
+
     dp.include_router(tg_bot_router)
     await tg_bot.set_webhook(
         url=project_settings.WEBHOOK_URL,
@@ -57,7 +61,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
 app.include_router(router)
 
-admin = Admin(app, engine)
+admin = Admin(
+    app=app,
+    engine=engine,
+    authentication_backend=authentication_backend,
+)
 admin.add_view(UserAdmin)
 admin.add_view(RoleAdmin)
 
