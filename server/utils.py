@@ -9,6 +9,8 @@
 
 """Utility helpers for password hashing and verification."""
 
+import secrets
+
 import bcrypt
 
 
@@ -24,3 +26,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     password_bytes = plain_password.encode("utf-8")
     hashed_bytes = hashed_password.encode("utf-8")
     return bcrypt.checkpw(password_bytes, hashed_bytes)
+
+
+def generate_api_key() -> str:
+    """Generate a cryptographically secure random API token."""
+    return f"ntb_{secrets.token_urlsafe(32)}"

@@ -21,8 +21,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 
 from server.database import Base
-from server.tg_bot.models import TelegramUser
-from server.models import User, Role
+from server.models import User, Role, UserSubdomain
 
 target_metadata = Base.metadata
 

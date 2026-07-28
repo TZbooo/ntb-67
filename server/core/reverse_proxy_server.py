@@ -18,8 +18,8 @@ Nginx to the appropriate tunnels.
 import asyncio
 
 from common.utils import close_writer, pipe
+from server.crud import get_user_by
 from server.database import get_db_session
-from server.tg_bot.crud import get_telegram_user_by
 
 from .http_utils import extract_subdomain
 from .models import TunnelRegistry
@@ -258,5 +258,5 @@ class ReverseProxyServer:
     async def _authenticate_user(self, api_key: str) -> bool:
         """Check whether the API key exists in PostgreSQL."""
         async with get_db_session() as session:
-            user = await get_telegram_user_by(session, api_key=api_key)
+            user = await get_user_by(session, api_key=api_key)
             return user is not None

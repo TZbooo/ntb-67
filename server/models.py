@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+from .utils import generate_api_key
 
 
 class Role(Base):
@@ -47,3 +48,35 @@ class User(Base):
         sa.Integer, sa.ForeignKey("roles.id"), nullable=False
     )
     role: Mapped["Role"] = relationship("Role", back_populates="users")
+
+    api_key: Mapped[str] = mapped_column(
+        sa.String(64), unique=True, nullable=False, default=generate_api_key
+    )
+    max_tunnels: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=1
+    )
+    subdomains: Mapped[list["UserSubdomain"]] = relationship(
+        "UserSubdomain", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class UserSubdomain(Base):
+    """Model for a subdomain assigned to a user for routing."""
+
+    __tablename__ = "user_subdomains"
+
+    id: Mapped[int] = mapped_column(
+        sa.Integer, primary_key=True, autoincrement=True
+    )
+
+    subdomain: Mapped[str] = mapped_column(
+        sa.String(63), unique=True, nullable=False
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        sa.BigInteger,
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="subdomains")

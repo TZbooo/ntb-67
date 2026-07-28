@@ -24,9 +24,7 @@ import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
-from aiogram import Bot, Dispatcher
-from aiogram.types import Update
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from sqladmin import Admin
 
 from server.admin.auth import authentication_backend
@@ -34,13 +32,8 @@ from server.admin.bootstrap import init_first_superuser
 from server.admin.views import RoleAdmin, UserAdmin
 from server.api.dependencies import APIContext
 from server.api.routes import router
-from server.config import project_settings
 from server.core import ReverseProxyServer
 from server.database import engine
-from server.tg_bot.handlers import tg_bot_router
-
-tg_bot = Bot(token=project_settings.TG_BOT_TOKEN)
-dp = Dispatcher()
 
 
 @asynccontextmanager
@@ -48,14 +41,7 @@ async def lifespan(app: FastAPI):
     """Manage the FastAPI lifecycle by enabling and disabling the webhook."""
     await init_first_superuser()
 
-    dp.include_router(tg_bot_router)
-    await tg_bot.set_webhook(
-        url=project_settings.WEBHOOK_URL,
-        allowed_updates=dp.resolve_used_update_types(),
-        drop_pending_updates=True,
-    )
     yield
-    await tg_bot.delete_webhook()
 
 
 app = FastAPI(title="NTB-67 Admin Core API", lifespan=lifespan)
@@ -68,16 +54,6 @@ admin = Admin(
 )
 admin.add_view(UserAdmin)
 admin.add_view(RoleAdmin)
-
-
-@app.post("/bot/webhook")
-async def telegram_webhook(request: Request) -> dict[str, str]:
-    """Endpoint that receives updates from Telegram."""
-    update = Update.model_validate(
-        await request.json(), context={"bot": tg_bot}
-    )
-    await dp.feed_update(tg_bot, update)
-    return {"status": "ok"}
 
 
 async def main() -> None:
