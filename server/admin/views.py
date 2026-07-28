@@ -17,9 +17,22 @@ from server.models import Role, User
 class UserAdmin(ModelView, model=User):
     """Admin view for managing user accounts."""
 
-    column_list = [User.id, User.username, User.is_active, User.role]
+    column_list = [
+        User.id,
+        User.username,
+        User.is_active,
+        User.role,
+        User.api_key,
+        User.max_tunnels,
+    ]
     column_searchable_list = [User.username]
-    form_columns = [User.username, User.is_active, User.role]
+    form_columns = [
+        User.username,
+        User.is_active,
+        User.role,
+        User.api_key,
+        User.max_tunnels,
+    ]
     icon = "fa-solid fa-user"
 
 
