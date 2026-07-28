@@ -22,7 +22,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.drop_table('telegram_users')
     op.drop_constraint(
         op.f('user_subdomains_user_id_fkey'),
         'user_subdomains',
@@ -36,6 +35,7 @@ def upgrade() -> None:
         ['id'],
         ondelete='CASCADE',
     )
+    op.drop_table('telegram_users')
 
     op.add_column('users', sa.Column('api_key', sa.String(length=64), nullable=True))
     op.add_column('users', sa.Column('max_tunnels', sa.Integer(), nullable=True))
