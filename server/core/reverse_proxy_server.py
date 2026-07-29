@@ -18,7 +18,7 @@ Nginx to the appropriate tunnels.
 import asyncio
 
 from common.utils import close_writer, pipe
-from server.crud import get_user_by
+from server.crud import create_subdomain, get_user_by
 from server.database import get_db_session
 
 from .http_utils import extract_subdomain
@@ -64,7 +64,10 @@ class ReverseProxyServer:
                     parts[2].strip() if len(parts) > 2 else None
                 )
 
-                if not await self._authenticate_user(api_key):
+                async with get_db_session() as session:
+                    user = await get_user_by(session, api_key=api_key)
+
+                if not user:
                     print(
                         f"🚫 Rejected: connection attempt with an invalid API key: {api_key[:10]}..."
                     )
@@ -79,8 +82,6 @@ class ReverseProxyServer:
                             subdomain = requested_subdomain
                             print(f"✅ Resuming existing tunnel: {subdomain}")
                         else:
-                            # The domain is ours, but the session in memory has already expired.
-                            # Recreate the structure with the same name.
                             subdomain = requested_subdomain
                             self.active_tunnels.register(subdomain)
                             print(
@@ -91,18 +92,18 @@ class ReverseProxyServer:
                             f"⚠️ Client attempted to claim a domain (possible abuse): {requested_subdomain}"
                         )
                 if not subdomain:
-                    subdomain = (
-                        generate_free_subdomain()
-                    )  # Generate a new subdomain for the client
+                    subdomain = generate_free_subdomain()
                     while self.active_tunnels.contains(subdomain):
                         subdomain = generate_free_subdomain()
 
                     print(f"🚀 Registering a new free tunnel: {subdomain}")
                     self.active_tunnels.register(subdomain)
                 self.active_tunnels.activate_control(subdomain, writer)
-                # Send the generated subdomain back to the client
                 writer.write(f"ASSIGNED:{subdomain}\n".encode("utf-8"))
                 await writer.drain()
+
+                async with get_db_session() as session:
+                    create_subdomain(session, user=user, subdomain=subdomain)
 
                 while True:
                     # Wait for a keep-alive or new commands from the client. Timeout: 10 minutes.
@@ -179,7 +180,6 @@ class ReverseProxyServer:
             print(
                 f"🚫 Request for an unknown or offline subdomain: {subdomain}.24tunl.ru"
             )
-            # Return a neat 404 placeholder
             html_body = b"<h1>404 Tunnel Not Found</h1><p>ntb-67: Active tunnel for this subdomain not found.</p>"
             response = (
                 b"HTTP/1.1 404 Not Found\r\n"
@@ -194,7 +194,6 @@ class ReverseProxyServer:
 
         # If the tunnel is online, ask it for a DATA connection
         tunnel = self.active_tunnels.get(subdomain)
-        # Ensure the tunnel has a control connection
         if not tunnel.control:
             print(
                 f"❌ The client control connection for {subdomain} is missing"
@@ -254,9 +253,3 @@ class ReverseProxyServer:
         await asyncio.gather(
             pipe(web_reader, data_writer), pipe(data_reader, web_writer)
         )
-
-    async def _authenticate_user(self, api_key: str) -> bool:
-        """Check whether the API key exists in PostgreSQL."""
-        async with get_db_session() as session:
-            user = await get_user_by(session, api_key=api_key)
-            return user is not None
