@@ -57,3 +57,34 @@ def create_subdomain(session: AsyncSession, user: User, subdomain: str) -> None:
     """
     user_subdomain_obj = UserSubdomain(subdomain=subdomain, user_id=user.id)
     session.add(user_subdomain_obj)
+
+
+async def remove_subdomain(
+    session: AsyncSession, user: User, subdomain: str
+) -> None:
+    """
+    Remove a subdomain associated with a given user.
+
+    Args:
+    ----
+        session: An active SQLAlchemy async session.
+        user: The User object associated with the subdomain.
+        subdomain: The subdomain string to be removed.
+
+    Raises:
+    ------
+        ValueError: If the subdomain does not exist for the given user.
+
+    """
+    query = select(UserSubdomain).filter_by(
+        subdomain=subdomain, user_id=user.id
+    )
+    result = await session.execute(query)
+    user_subdomain_obj = result.scalar_one_or_none()
+
+    if not user_subdomain_obj:
+        raise ValueError(
+            f"Subdomain '{subdomain}' does not exist for user '{user.username}'."
+        )
+
+    await session.delete(user_subdomain_obj)

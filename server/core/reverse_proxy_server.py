@@ -18,7 +18,7 @@ Nginx to the appropriate tunnels.
 import asyncio
 
 from common.utils import close_writer, pipe
-from server.crud import create_subdomain, get_user_by
+from server.crud import get_user_by
 from server.database import get_db_session
 
 from .http_utils import extract_subdomain
@@ -98,12 +98,11 @@ class ReverseProxyServer:
 
                     print(f"🚀 Registering a new free tunnel: {subdomain}")
                     self.active_tunnels.register(subdomain)
-                self.active_tunnels.activate_control(subdomain, writer)
+                await self.active_tunnels.activate_control(
+                    user=user, subdomain=subdomain, writer=writer
+                )
                 writer.write(f"ASSIGNED:{subdomain}\n".encode("utf-8"))
                 await writer.drain()
-
-                async with get_db_session() as session:
-                    create_subdomain(session, user=user, subdomain=subdomain)
 
                 while True:
                     # Wait for a keep-alive or new commands from the client. Timeout: 10 minutes.
@@ -146,7 +145,12 @@ class ReverseProxyServer:
             if subdomain and line.startswith("INIT"):
                 print(f"🧹 Cleaning up resources for subdomain: {subdomain}")
                 if self.active_tunnels.contains(subdomain):
-                    self.active_tunnels.remove(subdomain)
+                    async with get_db_session() as session:
+                        user = await get_user_by(session, subdomain=subdomain)
+                    if user:
+                        await self.active_tunnels.remove(
+                            user=user, subdomain=subdomain
+                        )
                 await close_writer(writer)
 
     async def handle_web_request(

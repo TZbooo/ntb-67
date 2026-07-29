@@ -18,6 +18,10 @@ NTB-67 project.
 import asyncio
 from dataclasses import dataclass
 
+from server.crud import create_subdomain, remove_subdomain
+from server.database import get_db_session
+from server.models import User
+
 
 @dataclass(frozen=True)
 class TunnelInfoDTO:
@@ -124,8 +128,8 @@ class TunnelRegistry:
         self._tunnels[subdomain] = session
         return session
 
-    def activate_control(
-        self, subdomain: str, writer: asyncio.StreamWriter
+    async def activate_control(
+        self, user: User, subdomain: str, writer: asyncio.StreamWriter
     ) -> None:
         """
         Attach the active control socket to the tunnel session.
@@ -135,22 +139,30 @@ class TunnelRegistry:
 
         Args:
         ----
+            user: The user associated with the tunnel.
             subdomain: The subdomain whose connection is being updated.
             writer: The control-channel StreamWriter.
 
         """
         self._tunnels[subdomain].control = writer
 
-    def remove(self, subdomain: str) -> None:
+        async with get_db_session() as session:
+            create_subdomain(session, user=user, subdomain=subdomain)
+
+    async def remove(self, user: User, subdomain: str) -> None:
         """
         Remove a tunnel session from the registry and free its subdomain.
 
         Args:
         ----
+            user: The user associated with the tunnel.
             subdomain: The subdomain that should be closed.
 
         """
         self._tunnels.pop(subdomain, None)
+
+        async with get_db_session() as session:
+            await remove_subdomain(session, user=user, subdomain=subdomain)
 
     def contains(self, subdomain: str) -> bool:
         """
