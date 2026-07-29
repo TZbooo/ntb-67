@@ -144,7 +144,6 @@ class ReverseProxyServer:
             # 2. The loop that kept the tunnel alive exited via break
             # If this was a successful DATA socket, we returned earlier and this block is skipped.
             if subdomain and line.startswith("INIT"):
-                print(self.active_tunnels)
                 print(f"🧹 Cleaning up resources for subdomain: {subdomain}")
                 if self.active_tunnels.contains(subdomain):
                     self.active_tunnels.remove(subdomain)
