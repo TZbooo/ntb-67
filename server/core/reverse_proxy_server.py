@@ -50,6 +50,7 @@ class ReverseProxyServer:
 
         """
         subdomain = None
+        api_key = None
         line = ""
         try:
             line_bytes = await reader.readline()
@@ -142,14 +143,12 @@ class ReverseProxyServer:
             # 1. An exception occurred (inside INIT or DATA)
             # 2. The loop that kept the tunnel alive exited via break
             # If this was a successful DATA socket, we returned earlier and this block is skipped.
-            if subdomain and line.startswith("INIT"):
+            if subdomain and line.startswith("INIT") and api_key:
                 print(f"🧹 Cleaning up resources for subdomain: {subdomain}")
                 if self.active_tunnels.contains(subdomain):
                     async with get_db_session() as session:
-                        user = await get_user_by(session, subdomain=subdomain)
-                    print(999999)
+                        user = await get_user_by(session, api_key=api_key)
                     if user:
-                        print(8888888888888)
                         await self.active_tunnels.remove(
                             user=user, subdomain=subdomain
                         )
