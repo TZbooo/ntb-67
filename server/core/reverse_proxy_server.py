@@ -147,7 +147,9 @@ class ReverseProxyServer:
                 if self.active_tunnels.contains(subdomain):
                     async with get_db_session() as session:
                         user = await get_user_by(session, subdomain=subdomain)
+                    print(999999)
                     if user:
+                        print(8888888888888)
                         await self.active_tunnels.remove(
                             user=user, subdomain=subdomain
                         )
