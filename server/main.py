@@ -29,7 +29,7 @@ from sqladmin import Admin
 
 from server.admin.auth import authentication_backend
 from server.admin.bootstrap import init_first_superuser
-from server.admin.views import RoleAdmin, UserAdmin
+from server.admin.views import RoleAdmin, UserAdmin, UserSubdomainAdmin
 from server.api.dependencies import APIContext
 from server.api.routes import router
 from server.core import ReverseProxyServer
@@ -54,6 +54,7 @@ admin = Admin(
 )
 admin.add_view(UserAdmin)
 admin.add_view(RoleAdmin)
+admin.add_view(UserSubdomainAdmin)
 
 
 async def main() -> None:
