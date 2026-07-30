@@ -11,7 +11,7 @@
 
 from sqladmin import ModelView
 
-from server.models import Role, User
+from server.models import Role, User, UserSubdomain
 
 
 class UserAdmin(ModelView, model=User):
@@ -42,3 +42,15 @@ class RoleAdmin(ModelView, model=Role):
     column_list = [Role.id, Role.name, Role.permissions]
     form_columns = [Role.name, Role.permissions]
     icon = "fa-solid fa-user-shield"
+
+
+class UserSubdomainAdmin(ModelView, model=UserSubdomain):
+    """Admin view for managing user subdomains."""
+
+    column_list = [
+        UserSubdomain.id,
+        UserSubdomain.subdomain,
+        UserSubdomain.user,
+    ]
+    form_columns = [UserSubdomain.subdomain, UserSubdomain.user]
+    icon = "fa-solid fa-globe"
