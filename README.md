@@ -1,65 +1,36 @@
-# ntb-67 — Asyncio Tunneling Proxy Client
+# ntb-67 — experimental tunneling client
 
-[![PyPI
-version](https://img.shields.io/pypi/v/ntb-67-client.svg)](https://pypi.org/project/ntb-67-client/)
-[![License](https://img.shields.io/badge/License-Source--Available-orange.svg)](LICENSE)
-[![Telegram
-Support](https://img.shields.io/badge/Telegram-Support-blue.svg?logo=telegram)](https://t.me/netbiom)
+This project is currently in an early and unstable state. The application still contains known bugs, and the project is not being maintained as a polished or production-ready tool.
 
-------------------------------------------------------------------------
+## Important notice
 
-ntb-67-client — это легковесный асинхронный CLI-клиент на базе Python
-asyncio, предназначенный для быстрого проброса локальных портов в
-глобальную сеть. Альтернатива таким инструментам, как ngrok и
-localtunnel.
+- This client is intended for experiments, local testing, and personal use.
+- Bugs, regressions, and unexpected behavior may appear without notice.
+- Tunnel stability, authentication flow, and proxy behavior are not guaranteed.
+- The project may change significantly between versions.
 
-> Проект в стадии разработки (WIP): Архитектура находится в состоянии
-> активного тестирования. Стабильность версий не гарантируется, а
-> документация будет дополняться по мере стабилизации API.
+## Current status
 
-### Особенности
+- Work in progress
+- No guarantee of backward compatibility
+- No production support or SLA
+- Documentation and issue handling may be incomplete
 
--   Полная асинхронность: Высокая производительность и низкое
-    потребление ресурсов благодаря asyncio.
--   Динамические поддомены: Автоматическое выделение уникальных адресов
-    на сервере маршрутизации.
--   Автоматическое возобновление: Устойчивость к кратковременным сбоям
-    сети и сохранение сессии подключения.
+## Usage
 
-### Требования
+If you still want to try it, use it at your own risk.
 
--   Python \>= 3.10
--   Перед использованием необходимо открыть Telegram-бота
-    **@Hwlajbdjxbot** и через меню получить свой **api_key** (код
-    доступа).
+Install:
 
-### Быстрый старт
-
-#### 1. Получение API-ключа
-
-1.  Откройте Telegram-бота **@Hwlajbdjxbot**.
-2.  Получите свой **api_key** через меню бота.
-
-#### 2. Установка
-
-Установите пакет напрямую из PyPI:
-
-``` bash
+```bash
 pip install ntb-67-client
 ```
 
-### Пример использования
-Выполните команду авторизации, указав полученный API-ключ:
+Example:
 
-``` bash
+```bash
 ntb-67-client auth <your_api_key>
-```
-
-Запустите туннель, указав порт локального веб-сервера (например, 8000):
-
-``` bash
 ntb-67-client start 8000
 ```
 
-После успешного подключения вы получите URL вида
-`https://<subdomain>.24tunl.ru`
+Please do not rely on this tool for critical infrastructure or business workflows.
