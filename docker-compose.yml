@@ -36,7 +36,7 @@ services:
     env_file: .env
     volumes:
       - /etc/letsencrypt:/etc/nginx/ssl:ro
-      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
