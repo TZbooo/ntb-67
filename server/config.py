@@ -21,6 +21,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ProjectSettings(BaseSettings):
     """Project configuration for NTB-67 loaded from environment variables."""
 
+    DOMAIN: str
+
     SECRET_KEY: str
 
     POSTGRES_USER: str
@@ -30,12 +32,6 @@ class ProjectSettings(BaseSettings):
     DB_PORT: int
 
     model_config = SettingsConfigDict(extra="ignore")
-
-    @computed_field
-    @property
-    def tunnel_live_time_seconds(self) -> float:
-        """Convert tunnel lifetime from hours to seconds."""
-        return self.TUNNEL_LIVE_TIME_HOURS * 3600
 
     @computed_field
     @property

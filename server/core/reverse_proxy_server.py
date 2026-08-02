@@ -182,7 +182,7 @@ class ReverseProxyServer:
 
         if not subdomain or not self.active_tunnels.contains(subdomain):
             print(
-                f"🚫 Request for an unknown or offline subdomain: {subdomain}.24tunl.ru"
+                f"🚫 Request for an unknown or offline subdomain: {subdomain}"
             )
             html_body = b"<h1>404 Tunnel Not Found</h1><p>ntb-67: Active tunnel for this subdomain not found.</p>"
             response = (
