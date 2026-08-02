@@ -75,7 +75,9 @@ class NTBClient:
 
             print("\n" + "=" * 50)
             print("🎉 Tunnel started successfully!")
-            print(f"🔗 Public address:  https://{self.subdomain}.24tunl.ru")
+            print(
+                f"🔗 Public address:  https://{self.subdomain}.{self.server_host}"
+            )
             print(f"🏠 Local port:   http://127.0.0.1:{self.local_port}")
             print("=" * 50 + "\n")
         elif response.startswith("ERROR:"):

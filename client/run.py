@@ -90,7 +90,9 @@ def start(
     local_port: int = typer.Argument(
         ..., help="Local port to expose (for example, 8000)"
     ),
-    host: str = typer.Option("24tunl.ru", help="Host of the remote NTB server"),
+    host: str = typer.Argument(
+        ..., help="Host of the remote NTB server, for example, 24tunl.ru"
+    ),
     port: int = typer.Option(
         9000, help="Control port of the remote NTB server"
     ),

@@ -72,7 +72,9 @@ async def get_client_status():
     client: NTBClient = app.state.ntb_client
 
     public_url = (
-        f"https://{client.subdomain}.24tunl.ru" if client.subdomain else None
+        f"https://{client.subdomain}.{client.server_host}"
+        if client.subdomain
+        else None
     )
 
     return ClientStatusResponse(
