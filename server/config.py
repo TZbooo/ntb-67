@@ -21,13 +21,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ProjectSettings(BaseSettings):
     """Project configuration for NTB-67 loaded from environment variables."""
 
-    TG_BOT_TOKEN: str
-
-    WEBHOOK_URL: str
-    WEBHOOK_SECRET: str
-
     SECRET_KEY: str
-    TUNNEL_LIVE_TIME_HOURS: float
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

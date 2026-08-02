@@ -32,17 +32,17 @@ http {
     server {
         listen 80;
         listen [::]:80;
-        server_name 24tunl.ru *.24tunl.ru;
+        server_name ${DOMAIN} *.${DOMAIN};
         return 301 https://$host$request_uri;
     }
 
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        server_name 24tunl.ru;
+        server_name ${DOMAIN};
 
-        ssl_certificate     /etc/nginx/ssl/live/24tunl.ru/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/live/24tunl.ru/privkey.pem;
+        ssl_certificate     /etc/nginx/ssl/live/${DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN}/privkey.pem;
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
@@ -57,10 +57,10 @@ http {
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        server_name api.24tunl.ru;
+        server_name api.${DOMAIN};
 
-        ssl_certificate     /etc/nginx/ssl/live/24tunl.ru/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/live/24tunl.ru/privkey.pem;
+        ssl_certificate     /etc/nginx/ssl/live/${DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN}/privkey.pem;
 
         location / {
             proxy_pass http://host.docker.internal:8080;
@@ -77,10 +77,10 @@ http {
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        server_name *.24tunl.ru;
+        server_name *.${DOMAIN};
 
-        ssl_certificate     /etc/nginx/ssl/live/24tunl.ru/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/live/24tunl.ru/privkey.pem;
+        ssl_certificate     /etc/nginx/ssl/live/${DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN}/privkey.pem;
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
