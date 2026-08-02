@@ -53,17 +53,4 @@ def is_valid_subdomain(subdomain: str) -> bool:
     if not hmac.compare_digest(signature, expected_signature):
         return False
 
-    try:
-        created_time = int(timestamp_hex, 16)
-    except ValueError:
-        return False
-
-    current_time = int(time.time())
-
-    if current_time - created_time > project_settings.tunnel_live_time_seconds:
-        print(
-            f"⏱️ Subdomain {subdomain} has expired (created more than {project_settings.tunnel_live_time_seconds} seconds ago)"
-        )
-        return False
-
     return True
