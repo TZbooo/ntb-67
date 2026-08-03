@@ -7,50 +7,11 @@
 # See the LICENSE file in the root directory for full terms and conditions.
 # For commercial inquiries, contact Telegram: https://t.me/netbiom
 
-"""
-Utilities for generating and validating temporary tunnel subdomains.
+"""Utilities for generating and validating tunnel subdomains."""
 
-The module creates signed subdomain values using HMAC-SHA256 and verifies
-that they are still within their allowed lifetime, protecting the tunnel
-service from forged or reused addresses.
-"""
-
-import hashlib
-import hmac
-import secrets
-import time
-
-from server.config import project_settings
+import uuid
 
 
 def generate_free_subdomain() -> str:
-    """Generate a random subdomain with a timestamp and HMAC signature."""
-    rand_bytes = secrets.token_hex(4)
-
-    timestamp_hex = hex(int(time.time()))[2:]
-
-    payload = f"{rand_bytes}:{timestamp_hex}"
-
-    signature = hmac.new(
-        project_settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()[:8]
-
-    return f"{rand_bytes}-{timestamp_hex}-{signature}"
-
-
-def is_valid_subdomain(subdomain: str) -> bool:
-    """Validate the subdomain structure, signature, and expiration time."""
-    if subdomain.count("-") != 2:
-        return False
-
-    rand_bytes, timestamp_hex, signature = subdomain.split("-", 2)
-
-    payload = f"{rand_bytes}:{timestamp_hex}"
-    expected_signature = hmac.new(
-        project_settings.SECRET_KEY.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()[:8]
-
-    if not hmac.compare_digest(signature, expected_signature):
-        return False
-
-    return True
+    """Generate a random subdomain."""
+    return str(uuid.uuid4())

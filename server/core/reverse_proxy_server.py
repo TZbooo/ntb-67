@@ -23,7 +23,7 @@ from server.database import get_db_session
 
 from .http_utils import extract_subdomain
 from .models import TunnelRegistry
-from .security import generate_free_subdomain, is_valid_subdomain
+from .security import generate_free_subdomain
 
 
 class ReverseProxyServer:
@@ -78,19 +78,14 @@ class ReverseProxyServer:
                     return
 
                 if requested_subdomain:
-                    if is_valid_subdomain(requested_subdomain):
-                        if self.active_tunnels.contains(requested_subdomain):
-                            subdomain = requested_subdomain
-                            print(f"✅ Resuming existing tunnel: {subdomain}")
-                        else:
-                            subdomain = requested_subdomain
-                            self.active_tunnels.register(subdomain)
-                            print(
-                                f"⏳ Session expired, but the domain is valid. Recreating tunnel: {subdomain}"
-                            )
+                    if self.active_tunnels.contains(requested_subdomain):
+                        subdomain = requested_subdomain
+                        print(f"✅ Resuming existing tunnel: {subdomain}")
                     else:
+                        subdomain = requested_subdomain
+                        self.active_tunnels.register(subdomain)
                         print(
-                            f"⚠️ Client attempted to claim a domain (possible abuse): {requested_subdomain}"
+                            f"⏳ Session expired, but the domain is valid. Recreating tunnel: {subdomain}"
                         )
                 if not subdomain:
                     subdomain = generate_free_subdomain()
