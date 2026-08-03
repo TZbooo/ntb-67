@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ntb-67-client"
-version = "0.1.6"
+version = "0.1.11"
 description = "Asyncio Tunneling Proxy Client — alternative for ngrok/localtunnel"
 readme = "README.md"
 authors = [
@@ -19,6 +19,9 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi==0.138.0",
     "textual==8.2.8",
+    "typer==0.26.7",
+    "uvicorn==0.35.0",
+    "httpx==0.28.1",
 ]
 
 [project.urls]
@@ -26,7 +29,7 @@ Homepage = "https://github.com/TZbooo/ntb-67"
 "Telegram Support" = "https://t.me/netbiom"
 
 [project.scripts]
-ntb-67-client = "client.tunnel_client:main"
+ntb-67-client = "client.run:app"
 
 [tool.setuptools]
 packages = ["client", "common"]
