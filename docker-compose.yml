@@ -12,7 +12,7 @@ services:
   ntb-server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.server
     container_name: ntb-proxy-server
     ports:
       - "8080:8080"
@@ -25,7 +25,7 @@ services:
     restart: always
     env_file: .env
     volumes:
-      - ./migrations/versions:/app/migrations/versions
+      - ./src/migrations/versions:/app/migrations/versions
 
   nginx:
     image: nginx:latest
